@@ -17,7 +17,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate dl_env
 
 # --- Run training script ---
-python train_resnet50.py \
+python -m scripts.train_classification \
     --dataset aptos2019 \
     --batch_size 32 \
     --epochs 80 \
@@ -25,3 +25,4 @@ python train_resnet50.py \
     --input_size 224 \
     --num_workers 8 \
     --val_split 0.1 \
+    --output_dir outputs/models
