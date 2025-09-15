@@ -8,10 +8,6 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 
-# --- Create logs directory if it doesn't exist ---
-mkdir -p logs
-mkdir -p outputs/models
-
 # --- Load conda environment ---
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate dl_env
