@@ -4,7 +4,6 @@ import torch.nn as nn
 import torch.optim as optim
 import wandb
 import time
-from torchvision.models import ResNet50_Weights
 
 from models.resnet import get_resnet50
 from utils.aptos_data_loader import get_aptos_loaders
