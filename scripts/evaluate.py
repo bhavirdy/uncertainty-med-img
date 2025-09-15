@@ -20,7 +20,7 @@ def evaluate(args):
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Load model ---
-    model = get_resnet50(num_classes=num_classes, weights=None, finetune=False)
+    model, _ = get_resnet50(num_classes=num_classes, weights=None)
     model = model.to(device)
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
@@ -71,8 +71,6 @@ def evaluate(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate ResNet50 classifier")
     parser.add_argument('--dataset', type=str, required=True, help='Dataset name')
-    parser.add_argument('--train_dir', type=str, required=True, help='Path to training data folder')
-    parser.add_argument('--test_dir', type=str, required=True, help='Path to test data folder')
     parser.add_argument('--model_path', type=str, required=True)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--input_size', type=int, default=224)

@@ -32,7 +32,7 @@ def get_aptos_loaders(train_csv="datasets/aptos2019/train_split.csv", val_csv="d
                       img_dir="datasets/aptos2019/images",
                       batch_size=32,
                       input_size=224,
-                      num_workers=4):
+                      num_workers=8):
 
     # Transforms
     train_tf = transforms.Compose([

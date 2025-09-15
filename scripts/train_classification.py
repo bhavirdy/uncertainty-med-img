@@ -14,7 +14,7 @@ def train(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Initialize W&B
-    wandb.init(project="resnet50-finetuned", config=vars(args))
+    wandb.init(project="resnet50", config=vars(args))
     config = wandb.config
 
     # --- Get data loaders based on dataset ---
@@ -24,17 +24,19 @@ def train(args):
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Model + optimizer ---
-    model, param_groups = get_resnet50(
-        num_classes=num_classes,
-        weights=ResNet50_Weights.DEFAULT,
-        finetune=True,
-        lr=config.lr,
-        layer4_lr_factor=0.1
-    )
+    model = get_resnet50(num_classes=num_classes, weights=None)  # Train from scratch
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(param_groups)
+    optimizer = optim.Adam(model.parameters(), lr=config.lr)
+
+    # --- Scheduler: Cosine Annealing ---
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
+
+    # --- Early stopping ---
+    best_val_loss = float('inf')
+    early_stop_counter = 0
+    early_stop_patience = 7  # Stop if no improvement for 7 epochs
 
     # --- Training loop ---
     train_losses, val_losses = [], []
@@ -90,20 +92,34 @@ def train(args):
             'val_acc': val_acc
         })
 
-    # Save model
+        # Step the scheduler
+        scheduler.step()
+
+        # Early stopping check
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            early_stop_counter = 0
+            # Save the best model so far
+            best_model_state = model.state_dict()
+        else:
+            early_stop_counter += 1
+            if early_stop_counter >= early_stop_patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                break
+
+    # Save best model
     timestamp = time.strftime("%Y%m%d-%H%M%S")
     model_filename = f"./outputs/models/model_ResNet50_{args.dataset}_{timestamp}_valacc{val_acc:.4f}.pth"
-    torch.save(model.state_dict(), model_filename)
-    wandb.save("model.pth")
+    torch.save(best_model_state, model_filename)
+    wandb.save(model_filename)
     wandb.finish()
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Finetuned ResNet50 classifier")
+    parser = argparse.ArgumentParser(description="ResNet50 classifier")
     parser.add_argument('--dataset', type=str, required=True, help='Dataset name, e.g. aptos2019')
-    parser.add_argument('--train_dir', type=str, required=True, help='Path to training data folder')
-    parser.add_argument('--test_dir', type=str, required=True, help='Path to test data folder')
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--epochs', type=int, default=80)
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--input_size', type=int, default=224)
     parser.add_argument('--num_workers', type=int, default=4)
