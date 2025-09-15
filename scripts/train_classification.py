@@ -126,3 +126,16 @@ def train(args):
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="ResNet50 classifier with gradual unfreezing")
+    parser.add_argument('--dataset', type=str, required=True, help='Dataset name, e.g. aptos2019')
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--epochs', type=int, default=80)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--input_size', type=int, default=224)
+    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--val_split', type=float, default=0.1)
+    args = parser.parse_args()
+
+    train(args)
