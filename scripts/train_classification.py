@@ -35,7 +35,7 @@ def train(args):
     # --- Early stopping ---
     best_val_loss = float('inf')
     early_stop_counter = 0
-    early_stop_patience = 7  # Stop if no improvement for 7 epochs
+    early_stop_patience = 7
 
     # --- Training loop ---
     train_losses, val_losses = [], []

@@ -20,7 +20,7 @@ def evaluate(args):
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Load model ---
-    model, _ = get_resnet50(num_classes=num_classes, weights=None)
+    model = get_resnet50(num_classes=num_classes, weights=None)
     model = model.to(device)
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
