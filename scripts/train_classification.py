@@ -6,7 +6,7 @@ import wandb
 import time
 from torchvision.models import ResNet50_Weights
 
-from models.resnet import get_resnet50_finetune 
+from models.resnet import get_resnet50
 from utils.aptos_data_loader import get_aptos_loaders
 from utils.metrics import accuracy
 
@@ -19,42 +19,51 @@ def train(args):
 
     # --- Get data loaders ---
     if args.dataset.lower() == "aptos2019":
-        train_loader, val_loader, _, num_classes = get_aptos_loaders()
+        train_loader, val_loader, _, num_classes = get_aptos_loaders(batch_size=args.batch_size)
     else:
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
-    # --- Model with gradual unfreezing ---
-    # Example: unfreeze layer3, layer4, and fc
-    model = get_resnet50_finetune(num_classes=num_classes,
-                                  weights=ResNet50_Weights.DEFAULT,
-                                  finetune_layers=("layer3", "layer4", "fc"))
+    # --- Compute class weights ---
+    labels = torch.tensor([y for _, y in train_loader.dataset])
+    class_counts = torch.bincount(labels)
+    class_weights = 1.0 / class_counts.float()
+    class_weights = class_weights / class_weights.sum() * num_classes
+    class_weights = class_weights.to(device)
+
+    # --- Model ---
+    model = get_resnet50(num_classes=num_classes, weights=ResNet50_Weights.DEFAULT)
     model = model.to(device)
 
-    criterion = nn.CrossEntropyLoss()
+    # Freeze everything initially
+    for param in model.parameters():
+        param.requires_grad = False
+    for param in model.fc.parameters():  # Only FC trainable first
+        param.requires_grad = True
 
-    # --- Optimizer with different LRs per layer group ---
-    lr_base = config.lr       # for pre-trained layers (layer3, layer4)
-    lr_fc = config.lr * 10    # for fully connected layer
-    param_groups = [
-        {"params": model.layer3.parameters(), "lr": lr_base},
-        {"params": model.layer4.parameters(), "lr": lr_base},
-        {"params": model.fc.parameters(), "lr": lr_fc}
-    ]
-    optimizer = optim.Adam(param_groups)
-
-    # --- Scheduler ---
+    # Loss, optimizer, scheduler
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
 
-    # --- Early stopping ---
+    # Early stopping
     best_val_loss = float('inf')
     early_stop_counter = 0
     early_stop_patience = 7
 
-    # --- Training loop ---
-    train_losses, val_losses = [], []
-    train_accs, val_accs = [], []
-
     for epoch in range(config.epochs):
+        # --- Progressive unfreezing schedule ---
+        if epoch == 5:   # after 5 epochs
+            for param in model.layer4.parameters():
+                param.requires_grad = True
+        if epoch == 10:  # after 10 epochs
+            for param in model.layer3.parameters():
+                param.requires_grad = True
+        if epoch == 20:  # after 20 epochs
+            for param in model.layer2.parameters():
+                param.requires_grad = True
+
+        optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
+
         # Training
         model.train()
         running_loss, running_acc = 0.0, 0.0
@@ -71,8 +80,6 @@ def train(args):
 
         epoch_loss = running_loss / len(train_loader.dataset)
         epoch_acc = running_acc / len(train_loader.dataset)
-        train_losses.append(epoch_loss)
-        train_accs.append(epoch_acc)
 
         # Validation
         model.eval()
@@ -82,20 +89,16 @@ def train(args):
                 imgs, labels = imgs.to(device), labels.to(device)
                 outputs = model(imgs)
                 loss = criterion(outputs, labels)
-
                 val_loss += loss.item() * imgs.size(0)
                 val_acc += accuracy(outputs, labels) * imgs.size(0)
 
         val_loss /= len(val_loader.dataset)
         val_acc /= len(val_loader.dataset)
-        val_losses.append(val_loss)
-        val_accs.append(val_acc)
 
         print(f"Epoch {epoch+1}/{config.epochs} - "
               f"Train loss: {epoch_loss:.4f} acc: {epoch_acc:.4f} | "
               f"Val loss: {val_loss:.4f} acc: {val_acc:.4f}")
 
-        # W&B logging
         wandb.log({
             'epoch': epoch + 1,
             'train_loss': epoch_loss,
@@ -104,7 +107,6 @@ def train(args):
             'val_acc': val_acc
         })
 
-        # Step scheduler
         scheduler.step()
 
         # Early stopping
@@ -124,17 +126,3 @@ def train(args):
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ResNet50 classifier with gradual unfreezing")
-    parser.add_argument('--dataset', type=str, required=True, help='Dataset name, e.g. aptos2019')
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=80)
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--input_size', type=int, default=224)
-    parser.add_argument('--num_workers', type=int, default=4)
-    parser.add_argument('--val_split', type=float, default=0.1)
-    args = parser.parse_args()
-
-    train(args)
