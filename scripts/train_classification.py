@@ -39,6 +39,10 @@ def train(args):
         param.requires_grad = False
     for param in model.fc.parameters():  # Only FC trainable first
         param.requires_grad = True
+    for param in model.layer4.parameters():
+        param.requires_grad = True
+    for param in model.layer3.parameters():
+        param.requires_grad = True
 
     # Loss, optimizer, scheduler
     criterion = nn.CrossEntropyLoss(weight=class_weights)
@@ -52,15 +56,15 @@ def train(args):
 
     for epoch in range(config.epochs):
         # --- Progressive unfreezing schedule ---
-        if epoch == 5:   # after 5 epochs
-            for param in model.layer4.parameters():
-                param.requires_grad = True
-        if epoch == 10:  # after 10 epochs
-            for param in model.layer3.parameters():
-                param.requires_grad = True
-        if epoch == 20:  # after 20 epochs
-            for param in model.layer2.parameters():
-                param.requires_grad = True
+        # if epoch == 5:   # after 5 epochs
+        #     for param in model.layer4.parameters():
+        #         param.requires_grad = True
+        # if epoch == 10:  # after 10 epochs
+        #     for param in model.layer3.parameters():
+        #         param.requires_grad = True
+        # if epoch == 20:  # after 20 epochs
+        #     for param in model.layer2.parameters():
+        #         param.requires_grad = True
 
         optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=config.lr)
 
@@ -126,7 +130,7 @@ def train(args):
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
-    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ResNet50 classifier with gradual unfreezing")
     parser.add_argument('--dataset', type=str, required=True, help='Dataset name, e.g. aptos2019')
