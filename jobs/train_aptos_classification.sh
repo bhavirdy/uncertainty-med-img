@@ -20,4 +20,3 @@ python -m scripts.train_classification \
     --lr 1e-4 \
     --input_size 224 \
     --num_workers 8 \
-    --val_split 0.1 \

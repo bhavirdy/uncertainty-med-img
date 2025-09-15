@@ -14,7 +14,7 @@ def train(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Initialize W&B
-    wandb.init(project="resnet50"+args.dataset.lower(), config=vars(args))
+    wandb.init(project="resnet50-"+args.dataset.lower(), config=vars(args))
     config = wandb.config
 
     # --- Get data loaders ---
@@ -27,7 +27,7 @@ def train(args):
     # Example: unfreeze layer3, layer4, and fc
     model = get_resnet50_finetune(num_classes=num_classes,
                                   weights=ResNet50_Weights.DEFAULT,
-                                  finetune_layers=("layer3", "layer4", "fc"))
+                                  finetune_layers=("layer2", "layer3", "layer4", "fc"))
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -36,6 +36,7 @@ def train(args):
     lr_base = config.lr   
     lr_fc = config.lr * 10    
     param_groups = [
+        {"params": model.layer2.parameters(), "lr": lr_base},
         {"params": model.layer3.parameters(), "lr": lr_base},
         {"params": model.layer4.parameters(), "lr": lr_base},
         {"params": model.fc.parameters(), "lr": lr_fc}
@@ -130,7 +131,6 @@ def train(args):
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ResNet50 classifier with gradual unfreezing")
