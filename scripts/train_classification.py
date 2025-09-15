@@ -4,8 +4,9 @@ import torch.nn as nn
 import torch.optim as optim
 import wandb
 import time
+from torchvision.models import ResNet50_Weights
 
-from models.resnet import get_resnet50
+from models.resnet import get_resnet50_finetune 
 from utils.aptos_data_loader import get_aptos_loaders
 from utils.metrics import accuracy
 
@@ -16,20 +17,32 @@ def train(args):
     wandb.init(project="resnet50", config=vars(args))
     config = wandb.config
 
-    # --- Get data loaders based on dataset ---
+    # --- Get data loaders ---
     if args.dataset.lower() == "aptos2019":
         train_loader, val_loader, _, num_classes = get_aptos_loaders()
     else:
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
-    # --- Model + optimizer ---
-    model = get_resnet50(num_classes=num_classes, weights=None)  # Train from scratch
+    # --- Model with gradual unfreezing ---
+    # Example: unfreeze layer3, layer4, and fc
+    model = get_resnet50_finetune(num_classes=num_classes,
+                                  weights=ResNet50_Weights.DEFAULT,
+                                  finetune_layers=("layer3", "layer4", "fc"))
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=config.lr)
 
-    # --- Scheduler: Cosine Annealing ---
+    # --- Optimizer with different LRs per layer group ---
+    lr_base = config.lr       # for pre-trained layers (layer3, layer4)
+    lr_fc = config.lr * 10    # for fully connected layer
+    param_groups = [
+        {"params": model.layer3.parameters(), "lr": lr_base},
+        {"params": model.layer4.parameters(), "lr": lr_base},
+        {"params": model.fc.parameters(), "lr": lr_fc}
+    ]
+    optimizer = optim.Adam(param_groups)
+
+    # --- Scheduler ---
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs)
 
     # --- Early stopping ---
@@ -91,14 +104,13 @@ def train(args):
             'val_acc': val_acc
         })
 
-        # Step the scheduler
+        # Step scheduler
         scheduler.step()
 
-        # Early stopping check
+        # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             early_stop_counter = 0
-            # Save the best model so far
             best_model_state = model.state_dict()
         else:
             early_stop_counter += 1
@@ -115,7 +127,7 @@ def train(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ResNet50 classifier")
+    parser = argparse.ArgumentParser(description="ResNet50 classifier with gradual unfreezing")
     parser.add_argument('--dataset', type=str, required=True, help='Dataset name, e.g. aptos2019')
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--epochs', type=int, default=80)
