@@ -3,16 +3,16 @@
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --partition=stampede
-#SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 
-# -----------------------------
-# Activate Miniconda environment
-# -----------------------------
+# --- Create logs directory if it doesn't exist ---
+mkdir -p logs
+mkdir -p outputs/models
+
+# --- Load conda environment ---
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate dl_env
 
@@ -24,4 +24,4 @@ python train_resnet50.py \
     --lr 1e-4 \
     --input_size 224 \
     --num_workers 8 \
-    --val_split 0.1
+    --val_split 0.1 \
