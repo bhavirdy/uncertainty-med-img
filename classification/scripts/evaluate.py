@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from models.resnet import get_resnet50
-from utils.aptos_data_loader import get_aptos_loaders
+from classification.datasets.aptos2019.aptos_data_loader import get_aptos_loaders
 from utils.metrics import (
     accuracy,
     precision_recall_f1,
