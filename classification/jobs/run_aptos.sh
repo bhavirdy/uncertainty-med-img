@@ -17,18 +17,18 @@ RUN_DIR="./classification/results/${DATASET}/run_${TIMESTAMP}"
 mkdir -p "$RUN_DIR/train" "$RUN_DIR/eval" "$RUN_DIR/inference"
 
 # --- Train ---
-python ./classification/scripts/train.py \
+python -m classification.scripts.train \
     --config ./classification/configs/aptos_train_config.yaml
 
 MODEL_PATH=$RUN_DIR/train/model.pth
 
 # --- Evaluate ---
-python ./classification/scripts/evaluate.py \
+python -m classification.scripts.evaluate \
     --config ./classification/configs/aptos_eval_config.yaml \
     --model_path "$MODEL_PATH" \
 
 # --- Inference with UE ---
-# python classification/scripts/ue_inference.py \
+# python -m classification.scripts.ue_inference \
 #     --dataset $DATASET \
 #     --model_path "$MODEL_PATH" \
 #     --out_dir "$RUN_DIR/inference" \
