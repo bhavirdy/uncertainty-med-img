@@ -17,13 +17,13 @@ RUN_DIR="./classification/results/${DATASET}/run_${TIMESTAMP}"
 mkdir -p "$RUN_DIR/train" "$RUN_DIR/eval" "$RUN_DIR/inference"
 
 # --- Train ---
-python /classification/scripts/train.py \
+python ./classification/scripts/train.py \
     --config ./classification/configs/aptos_train_config.yaml
 
 MODEL_PATH=$RUN_DIR/train/model.pth
 
 # --- Evaluate ---
-python /classification/scripts/evaluate.py \
+python ./classification/scripts/evaluate.py \
     --config ./classification/configs/aptos_eval_config.yaml \
     --model_path "$MODEL_PATH" \
 
