@@ -2,3 +2,4 @@ datasets/
 *.pyc
 __pycache__
 wandb
+logs/
