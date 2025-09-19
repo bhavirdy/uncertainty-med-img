@@ -1,67 +1,96 @@
 import argparse
+import os
+import random
+import yaml
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import wandb
-import time
+import csv
 from torchvision.models import ResNet50_Weights
 
-from models.resnet import get_resnet50_finetune  
-from classification.datasets.aptos2019.aptos_data_loader import get_aptos_loaders
-from utils.metrics import accuracy
+from classification.models.resnet import get_resnet50  
+from classification.data_loaders.aptos_data_loader import get_aptos_loaders
+from classification.utils.metrics import accuracy
 
-def train(args):
+def set_seed(seed: int):
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+def train(config):
+    # --- Device ---
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Initialize W&B
-    wandb.init(project="resnet50-"+args.dataset.lower(), config=vars(args))
-    config = wandb.config
+    # --- Seed ---
+    set_seed(config['seed'])
 
-    # --- Get data loaders ---
-    if args.dataset.lower() == "aptos2019":
-        train_loader, val_loader, _, num_classes = get_aptos_loaders()
+    # --- Initialize W&B ---
+    wandb.init(project="resnet50-" + config['dataset'].lower(), config=config)
+    cfg = wandb.config
+
+    # --- Data loaders ---
+    if cfg.dataset.lower() == "aptos2019":
+        train_loader, val_loader, _, num_classes = get_aptos_loaders(batch_size=cfg.batch_size, num_workers=cfg.num_workers)
     else:
-        raise ValueError(f"Dataset {args.dataset} not supported.")
+        raise ValueError(f"Dataset {cfg.dataset} not supported.")
 
-    # --- Model with unfreezing ---
-    # Example: unfreeze layer3, layer4, and fc
-    model = get_resnet50_finetune(num_classes=num_classes,
-                                  weights=ResNet50_Weights.DEFAULT,
-                                  finetune_layers=("layer2", "layer3", "layer4", "fc"))
+    # --- Model ---
+    finetune_layers = tuple(cfg.finetune_layers)
+    model = get_resnet50(num_classes=num_classes, weights=ResNet50_Weights.DEFAULT, finetune_layers=finetune_layers, dropout_p=cfg.dropout)
     model = model.to(device)
 
+    # --- Loss ---
     criterion = nn.CrossEntropyLoss()
 
-    # --- Optimizer with different LRs per layer group ---
-    lr_base = config.lr   
-    lr_fc = config.lr * 10    
-    param_groups = [
-        {"params": model.layer2.parameters(), "lr": lr_base},
-        {"params": model.layer3.parameters(), "lr": lr_base},
-        {"params": model.layer4.parameters(), "lr": lr_base},
-        {"params": model.fc.parameters(), "lr": lr_fc}
-    ]
+    # --- Optimizer ---
+    lr_base = float(cfg.lr)
+    lr_fc = lr_base * 10
+    param_groups = []
+
+    if "layer1" in finetune_layers:
+        param_groups.append({"params": model.layer1.parameters(), "lr": lr_base * 0.5})
+    if "layer2" in finetune_layers:
+        param_groups.append({"params": model.layer2.parameters(), "lr": lr_base})
+    if "layer3" in finetune_layers:
+        param_groups.append({"params": model.layer3.parameters(), "lr": lr_base})
+    if "layer4" in finetune_layers:
+        param_groups.append({"params": model.layer4.parameters(), "lr": lr_base})
+    # fc 
+    param_groups.append({"params": model.fc.parameters(), "lr": lr_fc})
+
     optimizer = optim.Adam(param_groups)
 
     # --- Scheduler ---
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 
-        mode='min', 
-        factor=0.1, 
-        patience=3, 
-        verbose=True
-    )
+    if cfg.scheduler == 'plateau':
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.1, patience=3
+        )
+    elif cfg.scheduler == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
+    else:
+        raise ValueError(f"Unsupported scheduler: {cfg.scheduler}")
 
     # --- Early stopping ---
     best_val_loss = float('inf')
     early_stop_counter = 0
-    early_stop_patience = 7
+    early_stop_patience = cfg.early_stop_patience
+
+    # --- Prepare CSV logging ---
+    output_dir = cfg.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    log_csv_path = os.path.join(output_dir, "train_log.csv")
+    with open(log_csv_path, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
     # --- Training loop ---
     train_losses, val_losses = [], []
     train_accs, val_accs = [], []
 
-    for epoch in range(config.epochs):
+    for epoch in range(cfg.epochs):
         # Training
         model.train()
         running_loss, running_acc = 0.0, 0.0
@@ -98,9 +127,9 @@ def train(args):
         val_losses.append(val_loss)
         val_accs.append(val_acc)
 
-        print(f"Epoch {epoch+1}/{config.epochs} - "
-              f"Train loss: {epoch_loss:.4f} acc: {epoch_acc:.4f} | "
-              f"Val loss: {val_loss:.4f} acc: {val_acc:.4f}")
+        print(f"Epoch {epoch+1}/{cfg.epochs} - "
+              f"Train loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | "
+              f"Val loss: {val_loss:.4f} Acc: {val_acc:.4f}")
 
         # W&B logging
         wandb.log({
@@ -111,8 +140,16 @@ def train(args):
             'val_acc': val_acc
         })
 
-        # Step scheduler
-        scheduler.step(val_loss)
+        # --- CSV logging ---
+        with open(log_csv_path, mode='a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
+
+        # Scheduler step
+        if cfg.scheduler == 'plateau':
+            scheduler.step(val_loss)
+        else:
+            scheduler.step()
 
         # Early stopping
         if val_loss < best_val_loss:
@@ -126,20 +163,25 @@ def train(args):
                 break
 
     # Save best model
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    model_filename = f"./outputs/models/model_ResNet50_{args.dataset}_{timestamp}_valacc{val_acc:.4f}.pth"
+    output_dir = cfg.output_dir
+    os.makedirs(output_dir, exist_ok=True)
+    model_filename = os.path.join(output_dir, f"model.pth")
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
 
+    # --- Save a copy of config ---
+    config_copy_path = os.path.join(output_dir, "config.yaml")
+    with open(config_copy_path, "w") as f:
+        yaml.safe_dump(config, f)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="ResNet50 classifier with gradual unfreezing")
-    parser.add_argument('--dataset', type=str, required=True, help='Dataset name, e.g. aptos2019')
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=80)
-    parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--input_size', type=int, default=224)
-    parser.add_argument('--num_workers', type=int, default=8)
+    parser = argparse.ArgumentParser(description="Train ResNet50")
+    parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
     args = parser.parse_args()
 
-    train(args)
+    # Load config from YAML
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+
+    train(config)

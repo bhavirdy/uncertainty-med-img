@@ -1,0 +1,21 @@
+# Dataset & output
+dataset: aptos2019
+output_dir: ./classification/results/aptos2019/train
+
+# Training hyperparameters
+epochs: 80
+batch_size: 32
+lr: 1e-3                    # Base learning rate for pretrained layers
+scheduler: plateau          # Options: plateau, cosine
+dropout: 0.5
+early_stop_patience: 7
+
+# Layer blocks to finetune (subset of ["layer1", "layer2", "layer3", "layer4", "fc"])
+finetune_layers:
+  - layer3
+  - layer4
+  - fc
+
+# Misc
+seed: 42
+num_workers: 8

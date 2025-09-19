@@ -6,7 +6,7 @@ def accuracy(outputs, labels):
     correct = (preds == labels).sum().item()
     return correct / labels.size(0)
 
-def precision_recall_f1(y_true, y_pred, num_classes):
+def precision_recall_f1(y_true, y_pred):
     precision = precision_score(y_true, y_pred, average='macro', zero_division=0)
     recall = recall_score(y_true, y_pred, average='macro', zero_division=0)
     f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)

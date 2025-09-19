@@ -1,0 +1,4 @@
+dataset: "aptos2019"
+batch_size: 32
+output_dir: "./classification/results/aptos2019/eval"
+save_preds: True
