@@ -5,16 +5,18 @@ output_dir: "{OUTPUT_DIR}"
 # Training hyperparameters
 epochs: 50
 batch_size: 32
-lr: 1e-4                    # Base learning rate for pretrained layers
+lr: 1e-5                    
 dropout: 0.5
 early_stop_patience: 7
 
 # Gradual unfreezing schedule (epoch: layers to unfreeze)
 unfreeze_schedule:
+  0: ["fc"]
+  2: ["layer4"]
   4: ["layer3"]
-  9: ["layer4"]
-  19: ["layer2"]
-  29: ["layer1"]
+  6: ["layer2"]
+  8: ["layer1"]
+  10: ["conv1"]
 
 # Misc
 seed: 42
