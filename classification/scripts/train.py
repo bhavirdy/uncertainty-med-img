@@ -72,11 +72,6 @@ def train(config):
 
     optimizer = optim.AdamW(param_groups, weight_decay=1e-4)
 
-    # --- Scheduler (cosine annealing) ---
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=cfg.epochs, eta_min=lr_base * 0.01
-    )
-
     # --- Early stopping ---
     best_val_loss = float('inf')
     early_stop_counter = 0
@@ -138,17 +133,13 @@ def train(config):
               f"Train loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | "
               f"Val loss: {val_loss:.4f} Acc: {val_acc:.4f}")
 
-        # Step scheduler
-        scheduler.step()
-
         # W&B logging
         wandb.log({
             'epoch': epoch + 1,
             'train_loss': epoch_loss,
             'train_acc': epoch_acc,
             'val_loss': val_loss,
-            'val_acc': val_acc,
-            'lr': scheduler.get_last_lr()[0]
+            'val_acc': val_acc
         })
 
         # CSV logging
