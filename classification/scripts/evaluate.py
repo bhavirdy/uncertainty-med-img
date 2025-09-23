@@ -76,11 +76,6 @@ def evaluate(config):
         output_dir=output_dir
     )
 
-    # --- Save a copy of config ---
-    config_copy_path = os.path.join(output_dir, "config.yaml")
-    with open(config_copy_path, "w") as f:
-        yaml.safe_dump(config, f)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Model")
     parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
