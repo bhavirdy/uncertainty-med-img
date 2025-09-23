@@ -38,8 +38,7 @@ def train(config):
         raise ValueError(f"Dataset {cfg.dataset} not supported.")
 
     # --- Model ---
-    finetune_layers = tuple(cfg.finetune_layers)
-    model = get_resnet50(num_classes=num_classes, weights=ResNet50_Weights.DEFAULT, finetune_layers=finetune_layers, dropout_p=cfg.dropout)
+    model = get_resnet50(num_classes=num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=cfg.dropout)
     model = model.to(device)
 
     # --- Loss ---
