@@ -45,33 +45,12 @@ def train(config):
     # --- Loss ---
     criterion = nn.CrossEntropyLoss()
 
-    # --- Optimizer ---
+    # --- Base learning rates ---
     lr_base = float(cfg.lr)
     lr_fc = lr_base * 10
-    param_groups = []
 
-    if "layer1" in finetune_layers:
-        param_groups.append({"params": model.layer1.parameters(), "lr": lr_base * 0.5})
-    if "layer2" in finetune_layers:
-        param_groups.append({"params": model.layer2.parameters(), "lr": lr_base})
-    if "layer3" in finetune_layers:
-        param_groups.append({"params": model.layer3.parameters(), "lr": lr_base})
-    if "layer4" in finetune_layers:
-        param_groups.append({"params": model.layer4.parameters(), "lr": lr_base})
-    # fc 
-    param_groups.append({"params": model.fc.parameters(), "lr": lr_fc})
-
-    optimizer = optim.Adam(param_groups)
-
-    # --- Scheduler ---
-    if cfg.scheduler == 'plateau':
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.1, patience=3
-        )
-    elif cfg.scheduler == 'cosine':
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.epochs)
-    else:
-        raise ValueError(f"Unsupported scheduler: {cfg.scheduler}")
+    # --- Optimizer ---
+    optimizer = optim.Adam([{"params": model.fc.parameters(), "lr": lr_fc}])
 
     # --- Early stopping ---
     best_val_loss = float('inf')
@@ -86,11 +65,38 @@ def train(config):
         writer = csv.writer(f)
         writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
+    # --- Unfreeze schedule ---
+    unfreeze_schedule = cfg.get('unfreeze_schedule', {})
+
     # --- Training loop ---
     train_losses, val_losses = [], []
     train_accs, val_accs = [], []
 
     for epoch in range(cfg.epochs):
+        # --- Gradual unfreezing ---
+        if epoch in unfreeze_schedule:
+            for layer_name in unfreeze_schedule[epoch]:
+                layer = getattr(model, layer_name)
+                for param in layer.parameters():
+                    param.requires_grad = True
+                print(f"Unfroze {layer_name} at epoch {epoch+1}")
+        
+            # Re-create optimizer with newly trainable parameters
+            layer_lrs = {
+                "layer1": lr_base * 0.5,
+                "layer2": lr_base * 0.75,
+                "layer3": lr_base,
+                "layer4": lr_base
+            }
+
+            param_groups = [{"params": model.fc.parameters(), "lr": lr_fc}]
+            for layer_name, lr in layer_lrs.items():
+                layer = getattr(model, layer_name)
+                trainable_params = [p for p in layer.parameters() if p.requires_grad]
+                if trainable_params:
+                    param_groups.append({"params": trainable_params, "lr": lr})
+            optimizer = optim.Adam(param_groups)
+        
         # Training
         model.train()
         running_loss, running_acc = 0.0, 0.0
@@ -145,12 +151,6 @@ def train(config):
             writer = csv.writer(f)
             writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
 
-        # Scheduler step
-        if cfg.scheduler == 'plateau':
-            scheduler.step(val_loss)
-        else:
-            scheduler.step()
-
         # Early stopping
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -169,11 +169,6 @@ def train(config):
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
-
-    # --- Save a copy of config ---
-    config_copy_path = os.path.join(output_dir, "config.yaml")
-    with open(config_copy_path, "w") as f:
-        yaml.safe_dump(config, f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train ResNet50")

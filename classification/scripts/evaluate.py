@@ -10,13 +10,14 @@ from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.utils.metrics import precision_recall_f1
 from classification.utils.visualisations import plot_confusion_matrix
 
-def evaluate(config, model_path):
+def evaluate(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # --- Get data loaders based on dataset ---
     dataset_name = config["dataset"]
     batch_size = config["batch_size"]
     output_dir = config["output_dir"]
+    model_path = config["model_path"]
     save_preds = config["save_preds"]
 
     if dataset_name.lower() == "aptos2019":
@@ -83,10 +84,10 @@ def evaluate(config, model_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Model")
     parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
-    parser.add_argument('--model_path', type=str, required=True, help='Path to trained model')
     args = parser.parse_args()
 
+    # Load config from YAML
     with open(args.config, "r") as f:
         config = yaml.safe_load(f)
 
-    evaluate(config, args.model_path)
+    evaluate(config)

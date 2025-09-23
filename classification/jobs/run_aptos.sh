@@ -13,26 +13,36 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate dl_env
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./classification/results/${DATASET}/run_${TIMESTAMP}"
+RUN_DIR="./classification/results/aptos2019/run_${TIMESTAMP}"
 mkdir -p "$RUN_DIR/train" "$RUN_DIR/eval" "$RUN_DIR/inference"
+
+# --- Prepare run-specific configs ---
+TRAIN_CONFIG="$RUN_DIR/train_config.yaml"
+EVAL_CONFIG="$RUN_DIR/eval_config.yaml"
+# INFER_CONFIG="$RUN_DIR/infer_config.yaml"
+
+sed "s|{OUTPUT_DIR}|$RUN_DIR/train|g" ./classification/configs/aptos_train_config.yaml > "$TRAIN_CONFIG"
 
 # --- Train ---
 python -m classification.scripts.train \
-    --config ./classification/configs/aptos_train_config.yaml
+    --config "$TRAIN_CONFIG"
 
+# --- Create eval config with model path ---
 MODEL_PATH=$RUN_DIR/train/model.pth
+sed "s|{OUTPUT_DIR}|$RUN_DIR/eval|g; s|{MODEL_PATH}|$MODEL_PATH|g" \
+    ./classification/configs/aptos_eval_config.yaml > "$EVAL_CONFIG"
 
 # --- Evaluate ---
 python -m classification.scripts.evaluate \
-    --config ./classification/configs/aptos_eval_config.yaml \
-    --model_path "$MODEL_PATH" \
+    --config "$EVAL_CONFIG"
+
+# # --- Create inference config with model path ---
+# sed "s|{OUTPUT_DIR}|$RUN_DIR/inference|g; s|{MODEL_PATH}|$MODEL_PATH|g" \
+#     ./classification/configs/aptos_infer_config.yaml > "$INFER_CONFIG"
 
 # --- Inference with UE ---
 # python -m classification.scripts.ue_inference \
-#     --dataset $DATASET \
+#     --config "$INFER_CONFIG" \
 #     --model_path "$MODEL_PATH" \
-#     --out_dir "$RUN_DIR/inference" \
-#     --mcdo \
-#     --forward_passes 30
 
 echo "Run completed. All results saved in $RUN_DIR"

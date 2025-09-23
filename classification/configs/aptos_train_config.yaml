@@ -1,20 +1,20 @@
 # Dataset & output
 dataset: aptos2019
-output_dir: ./classification/results/aptos2019/train
+output_dir: "{OUTPUT_DIR}"
 
 # Training hyperparameters
-epochs: 80
+epochs: 50
 batch_size: 32
-lr: 1e-3                    # Base learning rate for pretrained layers
-scheduler: plateau          # Options: plateau, cosine
+lr: 1e-4                    # Base learning rate for pretrained layers
 dropout: 0.5
 early_stop_patience: 7
 
-# Layer blocks to finetune (subset of ["layer1", "layer2", "layer3", "layer4", "fc"])
-finetune_layers:
-  - layer3
-  - layer4
-  - fc
+# Gradual unfreezing schedule (epoch: layers to unfreeze)
+unfreeze_schedule:
+  4: ["layer3"]
+  9: ["layer4"]
+  19: ["layer2"]
+  29: ["layer1"]
 
 # Misc
 seed: 42
