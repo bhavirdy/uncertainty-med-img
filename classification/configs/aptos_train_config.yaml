@@ -11,12 +11,12 @@ early_stop_patience: 7
 
 # Gradual unfreezing schedule (epoch: layers to unfreeze)
 unfreeze_schedule:
-  0: ["fc"]
-  2: ["layer4"]
-  4: ["layer3"]
-  6: ["layer2"]
-  8: ["layer1"]
-  10: ["conv1"]
+  0: ["fc"]        # train head from the start
+  5: ["layer4"]    # last ResNet block
+  10: ["layer3"]   # mid-level features
+  20: ["layer2"]   # earlier features
+  30: ["layer1"]   # shallow conv block
+  40: ["conv1"]    # very early conv
 
 # Misc
 seed: 42
