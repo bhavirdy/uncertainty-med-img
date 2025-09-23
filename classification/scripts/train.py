@@ -9,7 +9,7 @@ import wandb
 import csv
 from torchvision.models import ResNet50_Weights
 
-from classification.models.resnet import get_resnet50  
+from classification.models.resnet import get_resnet50
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.utils.metrics import accuracy
 
@@ -33,23 +33,49 @@ def train(config):
 
     # --- Data loaders ---
     if cfg.dataset.lower() == "aptos2019":
-        train_loader, val_loader, _, num_classes = get_aptos_loaders(batch_size=cfg.batch_size, num_workers=cfg.num_workers)
+        train_loader, val_loader, _, num_classes = get_aptos_loaders(
+            batch_size=cfg.batch_size, num_workers=cfg.num_workers
+        )
     else:
         raise ValueError(f"Dataset {cfg.dataset} not supported.")
 
     # --- Model ---
-    model = get_resnet50(num_classes=num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=cfg.dropout)
+    model = get_resnet50(
+        num_classes=num_classes,
+        weights=ResNet50_Weights.DEFAULT,
+        dropout_p=cfg.dropout
+    )
     model = model.to(device)
 
     # --- Loss ---
     criterion = nn.CrossEntropyLoss()
 
-    # --- Base learning rates ---
+    # --- Base learning rate ---
     lr_base = float(cfg.lr)
-    lr_fc = lr_base * 10
 
-    # --- Optimizer ---
-    optimizer = optim.Adam([{"params": model.fc.parameters(), "lr": lr_fc}])
+    # --- Define discriminative LRs ---
+    layer_lrs = {
+        "fc": lr_base * 100,     # classification head
+        "layer4": lr_base * 10,
+        "layer3": lr_base * 3,
+        "layer2": lr_base,
+        "layer1": lr_base * 0.3,
+        "conv1": lr_base * 0.1,
+    }
+
+    # --- Optimizer (AdamW with weight decay) ---
+    param_groups = []
+    for layer_name, lr in layer_lrs.items():
+        if hasattr(model, layer_name):
+            layer = getattr(model, layer_name)
+            param_groups.append({"params": layer.parameters(), "lr": lr})
+
+    optimizer = optim.AdamW(param_groups, weight_decay=1e-4)
+
+    # --- Scheduler (cosine annealing) ---
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=cfg.epochs, eta_min=lr_base * 0.01
+    )
 
     # --- Early stopping ---
     best_val_loss = float('inf')
@@ -68,34 +94,15 @@ def train(config):
     unfreeze_schedule = cfg.get('unfreeze_schedule', {})
 
     # --- Training loop ---
-    train_losses, val_losses = [], []
-    train_accs, val_accs = [], []
-
     for epoch in range(cfg.epochs):
-        # --- Gradual unfreezing ---
+        # Gradual unfreezing
         if epoch in unfreeze_schedule:
             for layer_name in unfreeze_schedule[epoch]:
-                layer = getattr(model, layer_name)
-                for param in layer.parameters():
-                    param.requires_grad = True
-                print(f"Unfroze {layer_name} at epoch {epoch+1}")
-        
-            # Re-create optimizer with newly trainable parameters
-            layer_lrs = {
-                "layer1": lr_base * 0.5,
-                "layer2": lr_base * 0.75,
-                "layer3": lr_base,
-                "layer4": lr_base
-            }
+                if hasattr(model, layer_name):
+                    for param in getattr(model, layer_name).parameters():
+                        param.requires_grad = True
+            print(f"Unfroze {unfreeze_schedule[epoch]} at epoch {epoch+1}")
 
-            param_groups = [{"params": model.fc.parameters(), "lr": lr_fc}]
-            for layer_name, lr in layer_lrs.items():
-                layer = getattr(model, layer_name)
-                trainable_params = [p for p in layer.parameters() if p.requires_grad]
-                if trainable_params:
-                    param_groups.append({"params": trainable_params, "lr": lr})
-            optimizer = optim.Adam(param_groups)
-        
         # Training
         model.train()
         running_loss, running_acc = 0.0, 0.0
@@ -112,8 +119,6 @@ def train(config):
 
         epoch_loss = running_loss / len(train_loader.dataset)
         epoch_acc = running_acc / len(train_loader.dataset)
-        train_losses.append(epoch_loss)
-        train_accs.append(epoch_acc)
 
         # Validation
         model.eval()
@@ -123,18 +128,18 @@ def train(config):
                 imgs, labels = imgs.to(device), labels.to(device)
                 outputs = model(imgs)
                 loss = criterion(outputs, labels)
-
                 val_loss += loss.item() * imgs.size(0)
                 val_acc += accuracy(outputs, labels) * imgs.size(0)
 
         val_loss /= len(val_loader.dataset)
         val_acc /= len(val_loader.dataset)
-        val_losses.append(val_loss)
-        val_accs.append(val_acc)
 
         print(f"Epoch {epoch+1}/{cfg.epochs} - "
               f"Train loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | "
               f"Val loss: {val_loss:.4f} Acc: {val_acc:.4f}")
+
+        # Step scheduler
+        scheduler.step()
 
         # W&B logging
         wandb.log({
@@ -142,10 +147,11 @@ def train(config):
             'train_loss': epoch_loss,
             'train_acc': epoch_acc,
             'val_loss': val_loss,
-            'val_acc': val_acc
+            'val_acc': val_acc,
+            'lr': scheduler.get_last_lr()[0]
         })
 
-        # --- CSV logging ---
+        # CSV logging
         with open(log_csv_path, mode='a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
@@ -162,9 +168,7 @@ def train(config):
                 break
 
     # Save best model
-    output_dir = cfg.output_dir
-    os.makedirs(output_dir, exist_ok=True)
-    model_filename = os.path.join(output_dir, f"model.pth")
+    model_filename = os.path.join(output_dir, "model.pth")
     torch.save(best_model_state, model_filename)
     wandb.save(model_filename)
     wandb.finish()
@@ -174,7 +178,6 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
     args = parser.parse_args()
 
-    # Load config from YAML
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
