@@ -9,7 +9,7 @@ import wandb
 import csv
 from torchvision.models import ResNet50_Weights
 
-from classification.models.resnet import get_resnet50
+from classification.models.resnet import ResNet50MC
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.utils.metrics import accuracy
 
@@ -40,7 +40,7 @@ def train(config):
         raise ValueError(f"Dataset {cfg.dataset} not supported.")
 
     # --- Model ---
-    model = get_resnet50(
+    model = ResNet50MC(
         num_classes=num_classes,
         weights=ResNet50_Weights.DEFAULT,
         dropout_p=cfg.dropout
@@ -48,7 +48,10 @@ def train(config):
     model = model.to(device)
 
     # --- Loss ---
-    criterion = nn.CrossEntropyLoss()
+    if cfg.loss.lower() == "ce":
+        criterion = nn.CrossEntropyLoss()
+    else:
+        raise ValueError(f"Loss function not supported.")
 
     # --- Base learning rate ---
     lr_base = float(cfg.lr)

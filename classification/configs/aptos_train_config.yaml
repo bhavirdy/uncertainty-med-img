@@ -8,6 +8,7 @@ batch_size: 32
 lr: 1e-5                    
 dropout: 0.3
 early_stop_patience: 7
+loss: "ce"
 
 # Gradual unfreezing schedule (epoch: layers to unfreeze)
 unfreeze_schedule:

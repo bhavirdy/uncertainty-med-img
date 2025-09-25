@@ -5,10 +5,9 @@ import os
 import torch
 import numpy as np
 
-from classification.models.resnet import get_resnet50
+from classification.models.resnet import ResNet50MC
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.utils.metrics import precision_recall_f1
-from classification.utils.visualisations import plot_confusion_matrix
 
 def evaluate(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -19,6 +18,7 @@ def evaluate(config):
     output_dir = config["output_dir"]
     model_path = config["model_path"]
     save_preds = config["save_preds"]
+    dropout = config["dropout"]
 
     if dataset_name.lower() == "aptos2019":
         _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size)
@@ -26,7 +26,11 @@ def evaluate(config):
         raise ValueError(f"Dataset {dataset_name} not supported.")
 
     # --- Load model ---
-    model = get_resnet50(num_classes=num_classes, weights=None)
+    model = ResNet50MC(
+        num_classes=num_classes,
+        weights=None,        
+        dropout_p=dropout  # Keep same dropout as training
+    )
     model = model.to(device)
     state_dict = torch.load(model_path, map_location=device)
     model.load_state_dict(state_dict)
@@ -66,15 +70,6 @@ def evaluate(config):
     if save_preds and output_dir:
         preds_path = os.path.join(output_dir, "preds.npy")
         np.save(preds_path, np.array(all_preds))
-
-    # Plot and save confusion matrix
-    plot_confusion_matrix(
-        all_labels=all_labels,
-        all_preds=all_preds,
-        model_path=model_path,
-        class_names=list(range(num_classes)),
-        output_dir=output_dir
-    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate Model")
