@@ -35,7 +35,6 @@ def get_aptos_loaders(train_csv="./classification/datasets/aptos2019/train_split
         transforms.RandomResizedCrop(input_size, scale=(0.8, 1.0)),
         transforms.RandomRotation(15),
         transforms.RandomHorizontalFlip(),
-        # transforms.RandomVerticalFlip(),
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],

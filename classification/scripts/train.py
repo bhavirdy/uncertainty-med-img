@@ -1,11 +1,9 @@
 import argparse
 import os
-import random
 import yaml
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import wandb
 import csv
 from torchvision.models import ResNet50_Weights
 
@@ -13,52 +11,25 @@ from classification.models.resnet import ResNet50MC
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.utils.metrics import accuracy
 
-def set_seed(seed: int):
-    random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+def train(model, train_loader, val_loader, config, device):
+    """
+    Train a model given dataloaders and config.
+    """
 
-def train(config):
-    # --- Device ---
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    # --- Seed ---
-    set_seed(config['seed'])
-
-    # --- Initialize W&B ---
-    wandb.init(project="resnet50-" + config['dataset'].lower(), config=config)
-    cfg = wandb.config
-
-    # --- Data loaders ---
-    if cfg.dataset.lower() == "aptos2019":
-        train_loader, val_loader, _, num_classes = get_aptos_loaders(
-            batch_size=cfg.batch_size, num_workers=cfg.num_workers
-        )
-    else:
-        raise ValueError(f"Dataset {cfg.dataset} not supported.")
-
-    # --- Model ---
-    model = ResNet50MC(
-        num_classes=num_classes,
-        weights=ResNet50_Weights.DEFAULT,
-        dropout_p=cfg.dropout
-    )
     model = model.to(device)
 
-    # --- Loss ---
-    if cfg.loss.lower() == "ce":
+    # --- Loss function ---
+    if config["loss"].lower() == "ce":
         criterion = nn.CrossEntropyLoss()
     else:
-        raise ValueError(f"Loss function not supported.")
+        raise ValueError(f"Loss function {config['loss']} not supported.")
 
     # --- Base learning rate ---
-    lr_base = float(cfg.lr)
+    lr_base = float(config["lr"])
 
-    # --- Define discriminative LRs ---
+    # --- Discriminative learning rates ---
     layer_lrs = {
-        "fc": lr_base * 100,     # classification head
+        "fc": lr_base * 100,
         "layer4": lr_base * 10,
         "layer3": lr_base * 3,
         "layer2": lr_base,
@@ -66,22 +37,21 @@ def train(config):
         "conv1": lr_base * 0.1,
     }
 
-    # --- Optimizer (AdamW with weight decay) ---
+    # --- Optimizer ---
     param_groups = []
     for layer_name, lr in layer_lrs.items():
         if hasattr(model, layer_name):
             layer = getattr(model, layer_name)
             param_groups.append({"params": layer.parameters(), "lr": lr})
-
     optimizer = optim.AdamW(param_groups, weight_decay=1e-4)
 
-    # --- Early stopping ---
+    # --- Early stopping setup ---
     best_val_loss = float('inf')
     early_stop_counter = 0
-    early_stop_patience = cfg.early_stop_patience
+    early_stop_patience = config["early_stop_patience"]
 
-    # --- Prepare CSV logging ---
-    output_dir = cfg.output_dir
+    # --- CSV logging ---
+    output_dir = config["output_dir"]
     os.makedirs(output_dir, exist_ok=True)
     log_csv_path = os.path.join(output_dir, "train_log.csv")
     with open(log_csv_path, mode='w', newline='') as f:
@@ -89,10 +59,10 @@ def train(config):
         writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
     # --- Unfreeze schedule ---
-    unfreeze_schedule = cfg.get('unfreeze_schedule', {})
+    unfreeze_schedule = config["unfreeze_schedule"]
 
     # --- Training loop ---
-    for epoch in range(cfg.epochs):
+    for epoch in range(config["epochs"]):
         # Gradual unfreezing
         if epoch in unfreeze_schedule:
             for layer_name in unfreeze_schedule[epoch]:
@@ -132,18 +102,9 @@ def train(config):
         val_loss /= len(val_loader.dataset)
         val_acc /= len(val_loader.dataset)
 
-        print(f"Epoch {epoch+1}/{cfg.epochs} - "
+        print(f"Epoch {epoch+1}/{config['epochs']} - "
               f"Train loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | "
               f"Val loss: {val_loss:.4f} Acc: {val_acc:.4f}")
-
-        # W&B logging
-        wandb.log({
-            'epoch': epoch + 1,
-            'train_loss': epoch_loss,
-            'train_acc': epoch_acc,
-            'val_loss': val_loss,
-            'val_acc': val_acc
-        })
 
         # CSV logging
         with open(log_csv_path, mode='a', newline='') as f:
@@ -161,18 +122,45 @@ def train(config):
                 print(f"Early stopping at epoch {epoch+1}")
                 break
 
-    # Save best model
-    model_filename = os.path.join(output_dir, "model.pth")
-    torch.save(best_model_state, model_filename)
-    wandb.save(model_filename)
-    wandb.finish()
+    # Save the best model
+    save_model(best_model_state, output_dir, filename="model.pth")
+
+def save_model(model_state, output_dir, filename):
+    """
+    Save the model state dict to the specified directory.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    model_path = os.path.join(output_dir, filename)
+    torch.save(model_state, model_path)
+    print(f"Saved model to {model_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train ResNet50")
     parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
     args = parser.parse_args()
 
+    # --- Load config ---
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
-    train(config)
+    # --- Device ---
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # --- Data loaders ---
+    if config["dataset"].lower() == "aptos2019":
+        train_loader, val_loader, _, num_classes = get_aptos_loaders(
+            batch_size=config["batch_size"],
+            num_workers=config["num_workers"]
+        )
+    else:
+        raise ValueError(f"Dataset {config['dataset']} not supported.")
+
+    # --- Model ---
+    model = ResNet50MC(
+        num_classes=num_classes,
+        weights=ResNet50_Weights.DEFAULT,
+        dropout_p=config["dropout"]
+    )
+
+    # --- Start training ---
+    train(model, train_loader, val_loader, config, device)

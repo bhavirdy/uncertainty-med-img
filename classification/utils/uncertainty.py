@@ -1,12 +1,19 @@
-import torch
+def mcdo_predictions(model, inputs, n_samples=20):
+    """Return MC Dropout predictions (stochastic forward passes)"""
+    pass
 
-def mcdo_uncertainty(mc_predictions):
-    """
-    mc_predictions: tensor of shape [n_samples, batch_size, num_classes]
-    Returns:
-        mean: predictive mean
-        variance: predictive variance (uncertainty)
-    """
-    mean = mc_predictions.mean(dim=0)
-    variance = mc_predictions.var(dim=0)
-    return mean, variance
+def deep_ensemble_predictions(models, inputs):
+    """Return predictions from a deep ensemble"""
+    pass
+
+def edl_predictions(model, inputs):
+    """Return predictions and uncertainty from evidential deep learning"""
+    pass
+
+def predictive_entropy(probs):
+    """Compute predictive entropy"""
+    pass
+
+def predictive_variance(predictions):
+    """Compute predictive variance"""
+    pass
