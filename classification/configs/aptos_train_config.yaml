@@ -6,7 +6,7 @@ output_dir: "{OUTPUT_DIR}"
 epochs: 50
 batch_size: 32
 lr: 1e-5                    
-dropout: 0.5
+dropout: 0.3
 early_stop_patience: 7
 
 # Gradual unfreezing schedule (epoch: layers to unfreeze)
