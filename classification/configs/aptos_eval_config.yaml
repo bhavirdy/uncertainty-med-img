@@ -3,3 +3,4 @@ batch_size: 32
 output_dir: "{OUTPUT_DIR}"
 model_path: "{MODEL_PATH}"
 save_preds: True
+dropout: 0.3
