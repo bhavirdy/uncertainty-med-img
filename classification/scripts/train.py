@@ -26,7 +26,7 @@ def train(model, train_loader, val_loader, config, device):
     warmup_lr = float(config["warmup_lr"])
 
     # --- Optimizer (only fc at start) ---
-    optimizer = optim.AdamW(model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
 
     # --- LR scheduler (Reduce on Plateau) ---
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
