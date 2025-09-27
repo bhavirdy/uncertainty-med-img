@@ -9,7 +9,7 @@ batch_size: 32
 lr: 1e-4
 warmup_lr: 1e-3              
 dropout: 0.5
-early_stop_patience: 9
+early_stop_patience: 7
 
 # Misc
 seed: 42
