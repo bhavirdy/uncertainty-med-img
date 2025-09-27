@@ -10,7 +10,7 @@
 
 # --- Load conda environment ---
 source ~/miniconda3/etc/profile.d/conda.sh
-conda activate dl_env
+conda activate opencv_env
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 RUN_DIR="./classification/results/aptos2019/run_${TIMESTAMP}"
