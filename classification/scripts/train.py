@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import csv
+import wandb
 from torchvision.models import ResNet50_Weights
 
 from classification.models.resnet import ResNet50MC
@@ -98,6 +99,15 @@ def train(model, train_loader, val_loader, config, device):
         with open(log_csv_path, mode='a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
+
+        # --- Wandb logging ---
+        wandb.log({
+            "epoch": epoch + 1,
+            "train_loss": epoch_loss,
+            "train_acc": epoch_acc,
+            "val_loss": val_loss,
+            "val_acc": val_acc
+        })
         
         # LR scheduler update
         scheduler.step(val_loss)
@@ -152,6 +162,12 @@ if __name__ == "__main__":
         weights=ResNet50_Weights.DEFAULT,
         dropout_p=config["dropout"]
     )
+
+    wandb.init(
+        project="resnet50-" + config["dataset"].lower(),
+        config=config
+    )
+    config = wandb.config
 
     # --- Start training ---
     train(model, train_loader, val_loader, config, device)
