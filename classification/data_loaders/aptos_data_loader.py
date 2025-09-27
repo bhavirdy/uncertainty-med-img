@@ -87,13 +87,6 @@ def get_aptos_loaders(train_csv="./classification/datasets/aptos2019/train_split
                       num_workers=8,
                       circle_crop=True):
 
-    tf = transforms.Compose([
-        transforms.Resize((input_size, input_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
-    ])
-
     train_tf = transforms.Compose([
         transforms.Resize((input_size, input_size)),
         transforms.RandomHorizontalFlip(p=0.5),
