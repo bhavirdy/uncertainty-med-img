@@ -3,21 +3,13 @@ dataset: aptos2019
 output_dir: "{OUTPUT_DIR}"
 
 # Training hyperparameters
-epochs: 50
+epochs: 30
+warmup_epochs: 5   
 batch_size: 32
-lr: 1e-5                    
-dropout: 0.3
-early_stop_patience: 7
-loss: "ce"
-
-# Gradual unfreezing schedule (epoch: layers to unfreeze)
-unfreeze_schedule:
-  0: ["fc"]        # train head from the start
-  5: ["layer4"]    # last ResNet block
-  10: ["layer3"]   # mid-level features
-  20: ["layer2"]   # earlier features
-  30: ["layer1"]   # shallow conv block
-  40: ["conv1"]    # very early conv
+lr: 1e-4
+warmup_lr: 1e-3              
+dropout: 0.5
+early_stop_patience: 9
 
 # Misc
 seed: 42

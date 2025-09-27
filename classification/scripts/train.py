@@ -19,31 +19,23 @@ def train(model, train_loader, val_loader, config, device):
     model = model.to(device)
 
     # --- Loss function ---
-    if config["loss"].lower() == "ce":
-        criterion = nn.CrossEntropyLoss()
-    else:
-        raise ValueError(f"Loss function {config['loss']} not supported.")
+    criterion = nn.CrossEntropyLoss()
 
-    # --- Base learning rate ---
-    lr_base = float(config["lr"])
+    # --- Learning rates ---
+    base_lr = float(config["lr"])
+    warmup_lr = float(config["warmup_lr"])
 
-    # --- Discriminative learning rates ---
-    layer_lrs = {
-        "fc": lr_base * 100,
-        "layer4": lr_base * 10,
-        "layer3": lr_base * 3,
-        "layer2": lr_base,
-        "layer1": lr_base * 0.3,
-        "conv1": lr_base * 0.1,
-    }
+    # --- Optimizer (only fc at start) ---
+    optimizer = optim.AdamW(model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
 
-    # --- Optimizer ---
-    param_groups = []
-    for layer_name, lr in layer_lrs.items():
-        if hasattr(model, layer_name):
-            layer = getattr(model, layer_name)
-            param_groups.append({"params": layer.parameters(), "lr": lr})
-    optimizer = optim.AdamW(param_groups, weight_decay=1e-4)
+    # --- LR scheduler (Reduce on Plateau) ---
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=3,
+        verbose=True
+    )
 
     # --- Early stopping setup ---
     best_val_loss = float('inf')
@@ -58,18 +50,14 @@ def train(model, train_loader, val_loader, config, device):
         writer = csv.writer(f)
         writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
-    # --- Unfreeze schedule ---
-    unfreeze_schedule = config["unfreeze_schedule"]
-
     # --- Training loop ---
     for epoch in range(config["epochs"]):
-        # Gradual unfreezing
-        if epoch in unfreeze_schedule:
-            for layer_name in unfreeze_schedule[epoch]:
-                if hasattr(model, layer_name):
-                    for param in getattr(model, layer_name).parameters():
-                        param.requires_grad = True
-            print(f"Unfroze {unfreeze_schedule[epoch]} at epoch {epoch+1}")
+        # Warmup phase
+        if epoch == config["warmup_epochs"]:
+            # Unfreeze all layers
+            for param in model.parameters():
+                param.requires_grad = True
+            optimizer = optim.AdamW(model.parameters(), lr=base_lr, weight_decay=1e-4)
 
         # Training
         model.train()
@@ -110,6 +98,9 @@ def train(model, train_loader, val_loader, config, device):
         with open(log_csv_path, mode='a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
+        
+        # LR scheduler update
+        scheduler.step(val_loss)
 
         # Early stopping
         if val_loss < best_val_loss:
