@@ -162,6 +162,7 @@ if __name__ == "__main__":
         dropout_p=config["dropout"]
     )
 
+    # --- Setup wandb logging ---
     wandb.init(
         project="resnet50-" + config["dataset"].lower(),
         config=config
