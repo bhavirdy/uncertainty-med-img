@@ -32,3 +32,13 @@ def predictive_variance(pred_samples):
 def predictive_entropy(probs):
     """Compute predictive entropy"""
     return -(probs * torch.log(probs + 1e-12)).sum(dim=1)
+
+def uncertainty_error_correlation(pred_probs, labels, measure='entropy'):
+    """Compute correlation between uncertainty and misclassification"""
+    preds = torch.argmax(pred_probs, dim=1)
+    incorrect = (preds != labels).float()
+    if measure == 'entropy':
+        uncertainty = predictive_entropy(pred_probs)
+    else:  # allow variance if pred_samples provided
+        uncertainty = pred_probs.var(dim=0).mean(dim=1)
+    return torch.corrcoef(torch.stack([uncertainty, incorrect]))[0,1].item()

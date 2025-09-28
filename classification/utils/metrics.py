@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from sklearn.metrics import precision_score, recall_score, f1_score, log_loss
+from sklearn.metrics import precision_score, recall_score, f1_score, log_loss, roc_auc_score, average_precision_score
 
 def accuracy(outputs, labels):
     """Compute accuracy"""
@@ -35,6 +35,18 @@ def ece(probs, labels, n_bins=15):
             ece_val += torch.abs(accuracies[mask].float().mean() - confidences[mask].mean()) * mask.float().mean()
     return ece_val.item()
 
+def mce(probs, labels, n_bins=15):
+    """Maximum Calibration Error"""
+    confidences, predictions = torch.max(probs, 1)
+    accuracies = predictions.eq(labels)
+    bin_boundaries = torch.linspace(0, 1, n_bins+1, device=probs.device)
+    errors = []
+    for i in range(n_bins):
+        mask = (confidences > bin_boundaries[i]) & (confidences <= bin_boundaries[i+1])
+        if mask.sum() > 0:
+            errors.append(torch.abs(accuracies[mask].float().mean() - confidences[mask].mean()).item())
+    return max(errors) if errors else 0.0
+
 def brier(probs, labels):
     """Brier Score"""
     probs_np = probs.detach().cpu().numpy()
@@ -48,18 +60,20 @@ def nll(probs, labels):
     labels_np = labels.detach().cpu().numpy()
     return log_loss(labels_np, probs_np, labels=[i for i in range(probs_np.shape[1])])
 
-def auroc(uncertainty, errors):
-    """AUROC for uncertainty vs. misclassification"""
-    pass
+def auroc(y_true, y_scores):
+    """Compute AUROC for binary or multilabel (one-vs-rest)"""
+    y_true_np = y_true.detach().cpu().numpy()
+    y_scores_np = y_scores.detach().cpu().numpy()
+    try:
+        return roc_auc_score(y_true_np, y_scores_np, average='macro', multi_class='ovr')
+    except ValueError:
+        return float('nan')
 
-def aupr(uncertainty, errors):
-    """AUPR for uncertainty vs. misclassification"""
-    pass
-
-def aurc(uncertainty, errors):
-    """Area under the risk-coverage curve"""
-    pass
-
-def fpr_at_95_tpr(uncertainty, errors):
-    """False Positive Rate at 95% True Positive Rate"""
-    pass
+def aupr(y_true, y_scores):
+    """Compute area under precision-recall curve"""
+    y_true_np = y_true.detach().cpu().numpy()
+    y_scores_np = y_scores.detach().cpu().numpy()
+    try:
+        return average_precision_score(y_true_np, y_scores_np, average='macro')
+    except ValueError:
+        return float('nan')
