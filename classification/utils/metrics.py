@@ -2,21 +2,25 @@ import torch
 import numpy as np
 from sklearn.metrics import precision_score, recall_score, f1_score, log_loss
 
-def accuracy(preds, labels):
+def accuracy(outputs, labels):
     """Compute accuracy"""
+    preds = torch.argmax(outputs, dim=1)
     correct = (preds == labels).sum().item()
     return correct / labels.size(0)
 
-def precision(preds, labels):
+def precision(outputs, labels):
     """Compute precision"""
+    preds = torch.argmax(outputs, dim=1)
     return precision_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
 
-def recall(preds, labels):
+def recall(outputs, labels):
     """Compute recall"""
+    preds = torch.argmax(outputs, dim=1)
     return recall_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
 
-def f1(preds, labels):
+def f1(outputs, labels):
     """Compute F1 score"""
+    preds = torch.argmax(outputs, dim=1)
     return f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
 
 def ece(probs, labels, n_bins=15):
