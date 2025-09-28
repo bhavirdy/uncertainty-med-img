@@ -67,11 +67,12 @@ if __name__ == "__main__":
     dropout = config["dropout"]
     model_path = config["model_path"]
     output_dir = config["output_dir"]
+    num_workers = config["num_workers"]
 
     if dataset_name.lower() == "aptos2019":
-        _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size)
+        _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size, num_workers=num_workers)
     elif dataset_name.lower() == "isic2018":
-        train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
+        _, _, test_loader, num_classes = get_isic2018_loaders(batch_size=batch_size, num_workers=num_workers)
     else:
         raise ValueError(f"Dataset {dataset_name} not supported.")
 

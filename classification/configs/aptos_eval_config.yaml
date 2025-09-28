@@ -4,3 +4,4 @@ output_dir: "{OUTPUT_DIR}"
 model_path: "{MODEL_PATH}"
 save_preds: True
 dropout: 0.5
+num_workers: 8
