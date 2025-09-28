@@ -10,6 +10,7 @@ from torchvision.models import ResNet50_Weights
 
 from classification.models.resnet import ResNet50MC
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
+from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import accuracy
 
 def train(model, train_loader, val_loader, config, device):
@@ -148,10 +149,9 @@ if __name__ == "__main__":
 
     # --- Data loaders ---
     if config["dataset"].lower() == "aptos2019":
-        train_loader, val_loader, _, num_classes = get_aptos_loaders(
-            batch_size=config["batch_size"],
-            num_workers=config["num_workers"]
-        )
+        train_loader, val_loader, _, num_classes = get_aptos_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
+    if config["dataset"].lower() == "isic2018":
+        train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
     else:
         raise ValueError(f"Dataset {config['dataset']} not supported.")
 

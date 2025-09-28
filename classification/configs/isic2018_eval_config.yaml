@@ -1,4 +1,4 @@
-dataset: "aptos2019"
+dataset: "isic2018"
 batch_size: 32
 output_dir: "{OUTPUT_DIR}"
 model_path: "{MODEL_PATH}"

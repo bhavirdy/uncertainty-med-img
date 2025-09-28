@@ -1,5 +1,5 @@
 # Dataset & output
-dataset: aptos2019
+dataset: isic2018
 output_dir: "{OUTPUT_DIR}"
 
 # Training hyperparameters

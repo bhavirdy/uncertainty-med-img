@@ -27,8 +27,9 @@ class ISIC2018Dataset(Dataset):
         if self.transform:
             image = self.transform(image)
 
-        # Multi-class one-hot label
-        label = torch.tensor(row[self.label_cols].values.astype("float32"))
+        # Convert one-hot row to class index
+        label = row[self.label_cols].values.astype("float32")
+        label = torch.tensor(label).argmax().long()  # class index [0..6]
 
         return image, label
 

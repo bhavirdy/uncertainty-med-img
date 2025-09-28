@@ -3,10 +3,10 @@ import yaml
 import json
 import os
 import torch
-import numpy as np
 
 from classification.models.resnet import ResNet50MC
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
+from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import accuracy, precision, recall, f1
 
 def evaluate(model, test_loader, device):
@@ -70,6 +70,8 @@ if __name__ == "__main__":
 
     if dataset_name.lower() == "aptos2019":
         _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size)
+    if dataset_name.lower() == "isic2018":
+        train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
     else:
         raise ValueError(f"Dataset {dataset_name} not supported.")
 
