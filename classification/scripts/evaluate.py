@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     if dataset_name.lower() == "aptos2019":
         _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size)
-    if dataset_name.lower() == "isic2018":
+    elif dataset_name.lower() == "isic2018":
         train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
     else:
         raise ValueError(f"Dataset {dataset_name} not supported.")

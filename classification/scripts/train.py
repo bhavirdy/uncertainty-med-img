@@ -150,7 +150,7 @@ if __name__ == "__main__":
     # --- Data loaders ---
     if config["dataset"].lower() == "aptos2019":
         train_loader, val_loader, _, num_classes = get_aptos_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
-    if config["dataset"].lower() == "isic2018":
+    elif config["dataset"].lower() == "isic2018":
         train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=config["batch_size"], num_workers=config["num_workers"])
     else:
         raise ValueError(f"Dataset {config['dataset']} not supported.")
