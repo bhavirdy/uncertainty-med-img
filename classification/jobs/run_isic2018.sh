@@ -13,7 +13,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./classification/results/isic20182019/run_${TIMESTAMP}"
+RUN_DIR="./classification/results/isic2018/run_${TIMESTAMP}"
 mkdir -p "$RUN_DIR/train" "$RUN_DIR/eval" "$RUN_DIR/inference"
 
 # --- Prepare run-specific configs ---
