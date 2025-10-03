@@ -11,7 +11,7 @@ def mcdo_predictions(model, inputs, n_samples=20):
         for _ in range(n_samples):
             out = torch.softmax(model(inputs), dim=1)
             preds.append(out.unsqueeze(0))
-    return torch.cat(preds, dim=0)  # [T, B, C]
+    return torch.cat(preds, dim=0)  # [S, B, C]
 
 def deep_ensemble_predictions(models, inputs):
     """Return predictions from a deep ensemble"""
@@ -32,13 +32,3 @@ def predictive_variance(pred_samples):
 def predictive_entropy(probs):
     """Compute predictive entropy"""
     return -(probs * torch.log(probs + 1e-12)).sum(dim=1)
-
-def uncertainty_error_correlation(pred_probs, labels, measure='entropy'):
-    """Compute correlation between uncertainty and misclassification"""
-    preds = torch.argmax(pred_probs, dim=1)
-    incorrect = (preds != labels).float()
-    if measure == 'entropy':
-        uncertainty = predictive_entropy(pred_probs)
-    else:  # allow variance if pred_samples provided
-        uncertainty = pred_probs.var(dim=0).mean(dim=1)
-    return torch.corrcoef(torch.stack([uncertainty, incorrect]))[0,1].item()

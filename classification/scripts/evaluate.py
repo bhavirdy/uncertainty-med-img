@@ -7,13 +7,12 @@ import torch
 from classification.models.resnet import ResNet50MC
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
-from classification.utils.metrics import accuracy, precision, recall, f1
+from classification.utils.metrics import accuracy, precision, recall, f1, auroc, aupr
 
 def evaluate(model, test_loader, device):
     """
     Evaluate a model and return metrics.
     """
-
     model = model.to(device)
     model.eval()
 
@@ -26,21 +25,34 @@ def evaluate(model, test_loader, device):
             all_labels.append(labels)
             all_preds.append(outputs)
 
-    # Concatenate all batches
     all_labels = torch.cat(all_labels)
     all_preds = torch.cat(all_preds)
 
-    # Compute metrics
-    acc = accuracy(all_preds, all_labels)
-    prec = precision(all_preds, all_labels)
-    rec = recall(all_preds, all_labels)
-    f1_score_val = f1(all_preds, all_labels)
-
     metrics = {
-        "accuracy": float(acc),
-        "precision": float(prec),
-        "recall": float(rec),
-        "f1": float(f1_score_val)
+        "accuracy": {
+            "macro": float(accuracy(all_preds, all_labels)),
+            "per_class": accuracy(all_preds, all_labels, per_class=True)
+        },
+        "precision": {
+            "macro": float(precision(all_preds, all_labels)),
+            "per_class": precision(all_preds, all_labels, per_class=True)
+        },
+        "recall": {
+            "macro": float(recall(all_preds, all_labels)),
+            "per_class": recall(all_preds, all_labels, per_class=True)
+        },
+        "f1": {
+            "macro": float(f1(all_preds, all_labels)),
+            "per_class": f1(all_preds, all_labels, per_class=True)
+        },
+        "auroc": {
+            "macro": float(auroc(all_preds, all_labels)),
+            "per_class": auroc(all_preds, all_labels, per_class=True)
+        },
+        "aupr": {
+            "macro": float(aupr(all_preds, all_labels)),
+            "per_class": aupr(all_preds, all_labels, per_class=True)
+        },
     }
 
     return metrics
@@ -52,7 +64,7 @@ def save_metrics(metrics, output_dir):
         with open(metrics_path, "w") as f:
             json.dump(metrics, f, indent=4)
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Evaluate Model")
     parser.add_argument('--config', type=str, required=True, help='Path to YAML config file')
     args = parser.parse_args()
@@ -90,3 +102,6 @@ if __name__ == "__main__":
 
     # --- Save metrics ---
     save_metrics(metrics, output_dir)
+
+if __name__ == "__main__":
+    main()
