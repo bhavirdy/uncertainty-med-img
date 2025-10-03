@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import torch
 
-def reliability_diagram(probs, labels, n_bins=15):
+def reliability_diagram(probs, labels, n_bins=15, output_path=""):
     confidences, predictions = torch.max(probs, 1)
     accuracies = predictions.eq(labels).float()
     bin_boundaries = torch.linspace(0, 1, n_bins+1)
@@ -18,18 +18,20 @@ def reliability_diagram(probs, labels, n_bins=15):
     plt.xlabel('Confidence')
     plt.ylabel('Accuracy')
     plt.title('Reliability Diagram')
-    plt.show()
+    plt.savefig(output_path)
+    plt.close()
 
-def predictive_entropy_histogram(probs, bins=30):
+def predictive_entropy_histogram(probs, bins=30, output_path=""):
     entropy = -(probs * torch.log(probs + 1e-12)).sum(dim=1).cpu().numpy()
     plt.figure()
     plt.hist(entropy, bins=bins)
     plt.xlabel('Predictive Entropy')
     plt.ylabel('Number of samples')
     plt.title('Predictive Entropy Histogram')
-    plt.show()
+    plt.savefig(output_path)
+    plt.close()
 
-def confidence_accuracy_plot(probs, labels, n_bins=15):
+def confidence_accuracy_plot(probs, labels, n_bins=15, output_path=""):
     confidences, predictions = torch.max(probs, 1)
     accuracies = (predictions == labels).float()
     bin_boundaries = torch.linspace(0, 1, n_bins+1)
@@ -45,4 +47,5 @@ def confidence_accuracy_plot(probs, labels, n_bins=15):
     plt.xlabel('Confidence')
     plt.ylabel('Accuracy')
     plt.title('Confidence vs Accuracy')
-    plt.show()
+    plt.savefig(output_path)
+    plt.close()
