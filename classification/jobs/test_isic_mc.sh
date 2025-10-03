@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=isic2018_run
-#SBATCH --output=logs/isic2018_%j.out
-#SBATCH --error=logs/isic2018_%j.err
+#SBATCH --output=logs/test_infer/isic2018_%j.out
+#SBATCH --error=logs/test_infer/isic2018_%j.err
 #SBATCH --partition=stampede
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
