@@ -1,0 +1,7 @@
+dataset: "isic2018"
+batch_size: 32
+output_dir: "./classification/results/isic2018/run_20250929-190504/eval"
+model_path: "./classification/results/isic2018/run_20250929-190504/train/model.pth"
+save_preds: True
+dropout: 0.5
+num_workers: 8

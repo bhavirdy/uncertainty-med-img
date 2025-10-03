@@ -1,0 +1,15 @@
+# Dataset & output
+dataset: isic2018
+output_dir: "./classification/results/isic2018/run_20250928-234016/train"
+
+# Training hyperparameters
+epochs: 30
+warmup_epochs: 5   
+batch_size: 32
+lr: 1e-4
+warmup_lr: 1e-3              
+dropout: 0.5
+early_stop_patience: 7
+
+# Misc
+num_workers: 8

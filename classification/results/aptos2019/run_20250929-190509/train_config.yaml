@@ -1,0 +1,15 @@
+# Dataset & output
+dataset: aptos2019
+output_dir: "./classification/results/aptos2019/run_20250929-190509/train"
+
+# Training hyperparameters
+epochs: 30
+warmup_epochs: 5 
+batch_size: 32
+lr: 1e-4
+warmup_lr: 1e-3              
+dropout: 0.5
+early_stop_patience: 50
+
+# Misc
+num_workers: 8

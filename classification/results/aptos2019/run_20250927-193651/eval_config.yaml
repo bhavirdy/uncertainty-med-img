@@ -1,0 +1,6 @@
+dataset: "aptos2019"
+batch_size: 32
+output_dir: "./classification/results/aptos2019/run_20250927-193651/eval"
+model_path: "./classification/results/aptos2019/run_20250927-193651/train/model.pth"
+save_preds: True
+dropout: 0.3
