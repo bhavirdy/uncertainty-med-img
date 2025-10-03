@@ -1,6 +1,6 @@
 dataset: "isic2018"
 batch_size: 32
 output_dir: "./classification/results/isic2018/test_infer"
-model_path: "./classification/results/isic2018/"
+model_path: "classification/results/isic2018/run_20250928-234016/train/model.pth"
 dropout: 0.5
 mc_samples: 20
