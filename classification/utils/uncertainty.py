@@ -17,10 +17,6 @@ def deep_ensemble_predictions(models, inputs):
     """Return predictions from a deep ensemble"""
     pass
 
-def edl_predictions(model, inputs):
-    """Return predictions and uncertainty from evidential deep learning"""
-    pass
-
 def predictive_mean(pred_samples):
     """Mean predictive distribution"""
     return pred_samples.mean(dim=0)

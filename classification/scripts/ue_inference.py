@@ -58,10 +58,6 @@ def mcdo_inference(model, test_loader, device, args):
 
     return metrics
 
-def deep_ensemble_inference(model, test_loader, device):
-    """Placeholder for Deep Ensemble uncertainty inference."""
-    pass
-
 def edl_inference(model, test_loader, device):
     """Placeholder for Evidential Deep Learning uncertainty inference."""
     pass
