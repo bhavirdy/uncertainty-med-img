@@ -18,7 +18,7 @@ from classification.utils.visualisations import (
     predictive_entropy_histogram_from_probs
 )
 
-def mcdo_inference(model, test_loader, device, n_samples, output_dir, args):
+def mcdo_inference(model, test_loader, device, args):
     """Perform Monte Carlo Dropout inference and compute uncertainty metrics."""
     all_probs = []
     all_labels = []
@@ -30,7 +30,7 @@ def mcdo_inference(model, test_loader, device, n_samples, output_dir, args):
         inputs, labels = inputs.to(device), labels.to(device)
 
         # --- Monte Carlo Dropout samples ---
-        pred_samples = mcdo_predictions(model, inputs, n_samples=n_samples)  # [S, B, C]
+        pred_samples = mcdo_predictions(model, inputs, n_samples=args.mc_samples)  # [S, B, C]
         probs = predictive_mean(pred_samples)  # [B, C]
 
         all_probs.append(probs.detach().cpu())
@@ -46,17 +46,17 @@ def mcdo_inference(model, test_loader, device, n_samples, output_dir, args):
         "brier": brier_from_probs(all_probs, all_labels),
         "nll": nll_from_probs(all_probs, all_labels),
     }
-    save_metrics(metrics, args.output_dir)
 
     # --- Plots ---
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
 
-        reliability_path = os.path.join(output_dir, "mcdo_reliability.png")
-        reliability_diagram_from_probs(all_probs, all_labels, output_path=reliability_path)
+    reliability_path = os.path.join(args.output_dir, "mcdo_reliability.png")
+    reliability_diagram_from_probs(all_probs, all_labels, output_path=reliability_path)
 
-        entropy_path = os.path.join(output_dir, "mcdo_entropy_hist.png")
-        predictive_entropy_histogram_from_probs(all_probs, output_path=entropy_path)
+    entropy_path = os.path.join(args.output_dir, "mcdo_entropy_hist.png")
+    predictive_entropy_histogram_from_probs(all_probs, output_path=entropy_path)
+
+    return metrics
 
 def deep_ensemble_inference(model, test_loader, device):
     """Placeholder for Deep Ensemble uncertainty inference."""
@@ -106,15 +106,9 @@ def main():
 
     # --- Run MC Dropout inference ---
     metrics = {}
-    metrics["mcdo"] = mcdo_inference(
-        model=model,
-        test_loader=test_loader,
-        device=device,
-        n_samples=args.mc_samples,
-        output_dir=args.output_dir,
-        args=args
-    )
+    metrics["mcdo"] = mcdo_inference(model, test_loader, device, args)
 
+    save_metrics(metrics, args.output_dir)
     print("Uncertainty estimation completed successfully.")
 
 if __name__ == "__main__":

@@ -118,7 +118,7 @@ def main():
     model.load_state_dict(state_dict)
 
     # --- Evaluate ---
-    evaluate(model, test_loader, device=device, args=args)
+    evaluate(model, test_loader, device, args)
     print("Evaluation complete.")
 
 if __name__ == "__main__":

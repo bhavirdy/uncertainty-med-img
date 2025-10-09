@@ -157,7 +157,7 @@ def main():
     )
 
     # --- Train ---
-    train(model, train_loader, val_loader, args, device)
+    train(model, train_loader, val_loader, device, args)
 
 if __name__ == "__main__":
     main()
