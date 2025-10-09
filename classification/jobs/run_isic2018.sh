@@ -32,9 +32,8 @@ python -m classification.scripts.train \
     --warmup_epochs 5 \
     --dropout 0.5 \
     --early_stop_patience 7 \
-    --output_dir "$TRAIN_DIR" \
-    --wandb_project isic2018_resnet50
-
+    --output_dir "$TRAIN_DIR"
+    
 # --- Model path ---
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
