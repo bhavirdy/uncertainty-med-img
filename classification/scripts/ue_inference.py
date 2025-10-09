@@ -58,10 +58,6 @@ def mcdo_inference(model, test_loader, device, args):
 
     return metrics
 
-def edl_inference(model, test_loader, device):
-    """Placeholder for Evidential Deep Learning uncertainty inference."""
-    pass
-
 def save_metrics(metrics, output_dir):
     """Save computed metrics as JSON."""
     if output_dir:
