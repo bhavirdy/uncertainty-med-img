@@ -1,5 +1,4 @@
 import argparse
-import yaml
 import json
 import os
 import torch
@@ -19,16 +18,18 @@ from classification.utils.visualisations import (
     predictive_entropy_histogram_from_probs
 )
 
-def mcdo_inference(model, test_loader, device, n_samples=20, output_dir=None):
+def mcdo_inference(model, test_loader, device, n_samples, output_dir, args):
+    """Perform Monte Carlo Dropout inference and compute uncertainty metrics."""
     all_probs = []
     all_labels = []
 
     model.to(device)
+    model.eval()
 
     for inputs, labels in test_loader:
         inputs, labels = inputs.to(device), labels.to(device)
 
-        # --- MC Dropout samples ---
+        # --- Monte Carlo Dropout samples ---
         pred_samples = mcdo_predictions(model, inputs, n_samples=n_samples)  # [S, B, C]
         probs = predictive_mean(pred_samples)  # [B, C]
 
@@ -45,69 +46,76 @@ def mcdo_inference(model, test_loader, device, n_samples=20, output_dir=None):
         "brier": brier_from_probs(all_probs, all_labels),
         "nll": nll_from_probs(all_probs, all_labels),
     }
+    save_metrics(metrics, args.output_dir)
 
     # --- Plots ---
     if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
 
-        # Reliability Diagram
-        output_path = os.path.join(output_dir, "mcdo_reliability.png")
-        reliability_diagram_from_probs(all_probs, all_labels, output_path=output_path)
+        reliability_path = os.path.join(output_dir, "mcdo_reliability.png")
+        reliability_diagram_from_probs(all_probs, all_labels, output_path=reliability_path)
 
-        # Predictive Entropy Histogram
-        output_path = os.path.join(output_dir, "mcdo_entropy_hist.png")
-        predictive_entropy_histogram_from_probs(all_probs, output_path=output_path)
-
-    return metrics
+        entropy_path = os.path.join(output_dir, "mcdo_entropy_hist.png")
+        predictive_entropy_histogram_from_probs(all_probs, output_path=entropy_path)
 
 def deep_ensemble_inference(model, test_loader, device):
+    """Placeholder for Deep Ensemble uncertainty inference."""
     pass
 
 def edl_inference(model, test_loader, device):
+    """Placeholder for Evidential Deep Learning uncertainty inference."""
     pass
 
 def save_metrics(metrics, output_dir):
+    """Save computed metrics as JSON."""
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-        with open(os.path.join(output_dir, "ue_metrics_all.json"), "w") as f:
+        path = os.path.join(output_dir, "ue_metrics_all.json")
+        with open(path, "w") as f:
             json.dump(metrics, f, indent=4)
+        print(f"Metrics saved to {path}")
 
 def main():
     parser = argparse.ArgumentParser(description="Uncertainty Estimation Inference")
-    parser.add_argument("--config", type=str, required=True, help="Path to inference config")
+
+    parser.add_argument("--dataset", type=str, required=True, choices=["aptos2019", "isic2018"], help="Dataset name")
+    parser.add_argument("--model_path", type=str, required=True, help="Path to trained model (.pth)")
+    parser.add_argument("--output_dir", type=str, required=True, help="Directory to save metrics and plots")
+    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for evaluation")
+    parser.add_argument("--num_workers", type=int, default=8, help="Number of dataloader workers")
+    parser.add_argument("--dropout", type=float, default=0.5, help="Dropout rate")
+    parser.add_argument("--mc_samples", type=int, default=20, help="Number of Monte Carlo Dropout samples")
     args = parser.parse_args()
 
-    with open(args.config, "r") as f:
-        config = yaml.safe_load(f)
-
-    dataset_name = config["dataset"]
-    batch_size = config["batch_size"]
-    dropout = config["dropout"]
-    model_path = config["model_path"]
-    mc_samples = config["mc_samples"]
-    output_dir = config["output_dir"]
-
-    if dataset_name.lower() == "aptos2019":
-        _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size)
-    elif dataset_name.lower() == "isic2018":
-        _, _, test_loader, num_classes = get_isic2018_loaders(batch_size=batch_size)
-    else:
-        raise ValueError(f"Dataset {dataset_name} not supported.")
-    
+    # --- Device setup ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-    model = ResNet50MC(num_classes=num_classes, dropout_p=dropout).to(device)
-    state_dict = torch.load(model_path, map_location=device)
+    # --- Load dataset ---
+    if args.dataset.lower() == "aptos2019":
+        _, _, test_loader, num_classes = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+    elif args.dataset.lower() == "isic2018":
+        _, _, test_loader, num_classes = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+    else:
+        raise ValueError(f"Dataset {args.dataset} not supported.")
+
+    # --- Load model ---
+    model = ResNet50MC(num_classes=num_classes, dropout_p=args.dropout).to(device)
+    state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
 
+    # --- Run MC Dropout inference ---
     metrics = {}
+    metrics["mcdo"] = mcdo_inference(
+        model=model,
+        test_loader=test_loader,
+        device=device,
+        n_samples=args.mc_samples,
+        output_dir=args.output_dir,
+        args=args
+    )
 
-    # Run all methods
-    metrics["mcdo"] = mcdo_inference(model=model, test_loader=test_loader, device=device, n_samples=mc_samples, output_dir=output_dir)
-    # metrics["deep_ensemble"] = deep_ensemble_inference(model=model, test_loader=test_loader, device=device)
-    # metrics["edl"] = edl_inference(model=model, test_loader=test_loader, device=device)
-
-    # --- Save metrics ---
-    save_metrics(metrics, output_dir)
+    print("Uncertainty estimation completed successfully.")
 
 if __name__ == "__main__":
     main()
