@@ -69,11 +69,11 @@ def evaluate(model, test_loader, device, args):
     # --- Generate plots ---
     reliability_diagram(
         all_preds, all_labels,
-        output_path=os.path.join(args.output_dir, "reliability_diagram.png")
+        output_path=os.path.join(args.output_dir, "reliability.png")
     )
     predictive_entropy_histogram(
         all_preds,
-        output_path=os.path.join(args.output_dir, "predictive_entropy_histogram.png")
+        output_path=os.path.join(args.output_dir, "entropy_hist.png")
     )
 
 def save_metrics(metrics, output_dir):
