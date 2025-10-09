@@ -94,7 +94,7 @@ def main():
     dropout = config["dropout"]
     model_path = config["model_path"]
     output_dir = config["output_dir"]
-    num_workers = config.get("num_workers", 4)
+    num_workers = config["num_workers"]
 
     if dataset_name.lower() == "aptos2019":
         _, _, test_loader, num_classes = get_aptos_loaders(batch_size=batch_size, num_workers=num_workers)
