@@ -3,7 +3,6 @@ import yaml
 import json
 import os
 import torch
-import matplotlib.pyplot as plt
 
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
@@ -16,9 +15,8 @@ from classification.utils.uncertainty import (
     predictive_mean
 )
 from classification.utils.visualisations import (
-    reliability_diagram,
-    predictive_entropy_histogram,
-    confidence_accuracy_plot
+    reliability_diagram_from_probs,
+    predictive_entropy_histogram_from_probs
 )
 
 def mcdo_inference(model, test_loader, device, n_samples=20, output_dir=None):
@@ -53,15 +51,11 @@ def mcdo_inference(model, test_loader, device, n_samples=20, output_dir=None):
 
         # Reliability Diagram
         output_path = os.path.join(output_dir, "mcdo_reliability.png")
-        reliability_diagram(all_probs, all_labels, output_path=output_path)
-
-        # Confidence vs Accuracy
-        output_path = os.path.join(output_dir, "mcdo_conf_acc.png")
-        confidence_accuracy_plot(all_probs, all_labels, output_path=output_path)
+        reliability_diagram_from_probs(all_probs, all_labels, output_path=output_path)
 
         # Predictive Entropy Histogram
         output_path = os.path.join(output_dir, "mcdo_entropy_hist.png")
-        predictive_entropy_histogram(all_probs, output_path=output_path)
+        predictive_entropy_histogram_from_probs(all_probs, output_path=output_path)
 
     return metrics
 
