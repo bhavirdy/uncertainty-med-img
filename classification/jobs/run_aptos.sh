@@ -12,36 +12,52 @@
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
+# --- Run directories ---
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
 RUN_DIR="./classification/results/aptos2019/run_${TIMESTAMP}"
-mkdir -p "$RUN_DIR/train" "$RUN_DIR/eval" "$RUN_DIR/inference"
-
-# --- Prepare run-specific configs ---
-TRAIN_CONFIG="$RUN_DIR/train_config.yaml"
-EVAL_CONFIG="$RUN_DIR/eval_config.yaml"
-INFER_CONFIG="$RUN_DIR/infer_config.yaml"
-
-sed "s|{OUTPUT_DIR}|$RUN_DIR/train|g" ./classification/configs/aptos_train_config.yaml > "$TRAIN_CONFIG"
+TRAIN_DIR="$RUN_DIR/train"
+EVAL_DIR="$RUN_DIR/eval"
+INFER_DIR="$RUN_DIR/inference"
+mkdir -p "$TRAIN_DIR" "$EVAL_DIR" "$INFER_DIR" logs
 
 # --- Train ---
+echo "Starting training..."
 python -m classification.scripts.train \
-    --config "$TRAIN_CONFIG"
+    --dataset aptos2019 \
+    --epochs 30 \
+    --batch_size 32 \
+    --num_workers 8 \
+    --lr 1e-4 \
+    --warmup_lr 1e-3 \
+    --warmup_epochs 5 \
+    --dropout 0.5 \
+    --early_stop_patience 7 \
+    --output_dir "$TRAIN_DIR" \
+    --wandb_project aptos2019_resnet50
 
-# --- Create eval config with model path ---
-MODEL_PATH=$RUN_DIR/train/model.pth
-sed "s|{OUTPUT_DIR}|$RUN_DIR/eval|g; s|{MODEL_PATH}|$MODEL_PATH|g" \
-    ./classification/configs/aptos_eval_config.yaml > "$EVAL_CONFIG"
+# --- Model path ---
+MODEL_PATH="$TRAIN_DIR/model.pth"
 
 # --- Evaluate ---
+echo "Starting evaluation..."
 python -m classification.scripts.evaluate \
-    --config "$EVAL_CONFIG"
+    --dataset aptos2019 \
+    --model_path "$MODEL_PATH" \
+    --batch_size 32 \
+    --num_workers 8 \
+    --dropout 0.5 \
+    --output_dir "$EVAL_DIR"
 
-# # --- Create inference config with model path ---
-# sed "s|{OUTPUT_DIR}|$RUN_DIR/inference|g; s|{MODEL_PATH}|$MODEL_PATH|g" \
-#     ./classification/configs/aptos_infer_config.yaml > "$INFER_CONFIG"
+# --- Uncertainty Inference ---
+echo "Starting uncertainty inference..."
+python -m classification.scripts.ue_inference \
+    --dataset aptos2019 \
+    --model_path "$MODEL_PATH" \
+    --batch_size 32 \
+    --num_workers 8 \
+    --dropout 0.5 \
+    --mc_samples 20 \
+    --output_dir "$INFER_DIR"
 
-# --- Inference with UE ---
-# python -m classification.scripts.ue_inference \
-#     --config "$INFER_CONFIG"
-
-echo "Run completed. All results saved in $RUN_DIR"
+echo "✅ Run completed successfully."
+echo "📂 All results saved in: $RUN_DIR"
