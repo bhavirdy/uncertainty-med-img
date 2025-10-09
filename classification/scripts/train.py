@@ -7,16 +7,23 @@ import csv
 import wandb
 from torchvision.models import ResNet50_Weights
 
-from classification.models.resnet import ResNet50MC
+from classification.models.resnet import ResNet50
+from classification.models.resnet_edl import ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import accuracy
+from classification.utils.edl_loss import evidential_loss
 
 def train(model, train_loader, val_loader, device, args):
     """Train the model using specified arguments."""
-
+    
     model = model.to(device)
-    criterion = nn.CrossEntropyLoss()
+    
+    # --- Choose loss function ---
+    if args.edl:
+        criterion = evidential_loss()
+    else:
+        criterion = nn.CrossEntropyLoss()
 
     base_lr = args.lr
     warmup_lr = args.warmup_lr
@@ -84,9 +91,9 @@ def train(model, train_loader, val_loader, device, args):
             writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
 
         wandb.log({
+            "epoch": epoch + 1,
             "train_loss": epoch_loss,
             "train_acc": epoch_acc,
-            "epoch": epoch + 1,
             "val_loss": val_loss,
             "val_acc": val_acc
         })
@@ -129,6 +136,8 @@ def main():
     parser.add_argument('--warmup_epochs', type=int, default=5, help='Warmup epochs')
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability')
     parser.add_argument('--early_stop_patience', type=int, default=7, help='Early stopping patience')
+    parser.add_argument('--edl', action='store_true', help='Use Evidential Deep Learning loss')
+
     args = parser.parse_args()
 
     # --- Device setup ---
@@ -144,15 +153,22 @@ def main():
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Model ---
-    model = ResNet50MC(
-        num_classes=num_classes,
-        weights=ResNet50_Weights.DEFAULT,
-        dropout_p=args.dropout
-    )
+    if args.edl:
+        model = ResNet50EDL(
+            num_classes=num_classes,
+            weights=ResNet50_Weights.DEFAULT,
+            dropout_p=args.dropout
+        )
+    else:
+        model = ResNet50(
+            num_classes=num_classes,
+            weights=ResNet50_Weights.DEFAULT,
+            dropout_p=args.dropout
+        )
 
     # --- WandB init ---
     wandb.init(
-        project="resnet50-" + args.dataset.lower(),
+        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
         config=vars(args)
     )
 
