@@ -8,23 +8,17 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 
-# --- Load conda environment ---
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
-# --- Run directories ---
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./classification/results/aptos2019/mcdo_run_${TIMESTAMP}"
+RUN_DIR="./classification/results/aptos2019/mcdo/run_${TIMESTAMP}"
 TRAIN_DIR="$RUN_DIR/train"
 EVAL_DIR="$RUN_DIR/eval"
-INFER_DIR="$RUN_DIR/inference"
-mkdir -p "$TRAIN_DIR" "$EVAL_DIR" "$INFER_DIR" logs
+mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
-# --- Train ---
-echo "Starting MCDO training..."
 python -m classification.scripts.train \
     --dataset aptos2019 \
-    --method mcdo \
     --epochs 30 \
     --batch_size 32 \
     --num_workers 8 \
@@ -35,11 +29,8 @@ python -m classification.scripts.train \
     --early_stop_patience 7 \
     --output_dir "$TRAIN_DIR"
 
-# --- Model path ---
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
-# --- Evaluate ---
-echo "Evaluating deterministic model..."
 python -m classification.scripts.evaluate \
     --dataset aptos2019 \
     --method mcdo \
@@ -47,18 +38,5 @@ python -m classification.scripts.evaluate \
     --batch_size 32 \
     --num_workers 8 \
     --dropout 0.5 \
-    --output_dir "$EVAL_DIR"
-
-# --- Uncertainty Inference ---
-echo "Performing MC Dropout uncertainty inference..."
-python -m classification.scripts.ue_inference \
-    --dataset aptos2019 \
-    --model_path "$MODEL_PATH" \
-    --batch_size 32 \
-    --num_workers 8 \
-    --dropout 0.5 \
     --mc_samples 20 \
-    --output_dir "$INFER_DIR"
-
-echo "✅ MCDO run completed successfully."
-echo "📂 Results saved in: $RUN_DIR"
+    --output_dir "$EVAL_DIR"

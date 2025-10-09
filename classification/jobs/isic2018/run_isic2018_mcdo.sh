@@ -12,16 +12,13 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./classification/results/isic2018/mcdo_run_${TIMESTAMP}"
+RUN_DIR="./classification/results/isic2018/mcdo/run_${TIMESTAMP}"
 TRAIN_DIR="$RUN_DIR/train"
 EVAL_DIR="$RUN_DIR/eval"
-INFER_DIR="$RUN_DIR/inference"
-mkdir -p "$TRAIN_DIR" "$EVAL_DIR" "$INFER_DIR" logs
+mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
-echo "🚀 Starting MCDO training..."
 python -m classification.scripts.train \
     --dataset isic2018 \
-    --method mcdo \
     --epochs 30 \
     --batch_size 32 \
     --num_workers 8 \
@@ -34,7 +31,6 @@ python -m classification.scripts.train \
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
-echo "📊 Evaluating deterministic model..."
 python -m classification.scripts.evaluate \
     --dataset isic2018 \
     --method mcdo \
@@ -42,17 +38,5 @@ python -m classification.scripts.evaluate \
     --batch_size 32 \
     --num_workers 8 \
     --dropout 0.5 \
-    --output_dir "$EVAL_DIR"
-
-echo "🔁 Performing MC Dropout uncertainty inference..."
-python -m classification.scripts.ue_inference \
-    --dataset isic2018 \
-    --model_path "$MODEL_PATH" \
-    --batch_size 32 \
-    --num_workers 8 \
-    --dropout 0.5 \
     --mc_samples 20 \
-    --output_dir "$INFER_DIR"
-
-echo "✅ MCDO run completed successfully."
-echo "📂 Results saved in: $RUN_DIR"
+    --output_dir "$EVAL_DIR"
