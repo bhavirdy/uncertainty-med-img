@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
@@ -27,7 +27,7 @@ python -m classification.scripts.train \
     --warmup_lr 1e-3 \
     --warmup_epochs 5 \
     --dropout 0.5 \
-    --early_stop_patience 7 \
+    --early_stop_patience 30 \
     --output_dir "$TRAIN_DIR"
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
