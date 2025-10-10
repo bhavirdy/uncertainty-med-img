@@ -16,22 +16,13 @@ from classification.utils.edl_loss import evidential_loss
 
 def train(model, train_loader, val_loader, device, args):
     """Train the model using specified arguments."""
-    
     model = model.to(device)
-    
-    # --- Choose loss function ---
-    if args.edl:
-        criterion = evidential_loss()
-    else:
-        criterion = nn.CrossEntropyLoss()
 
     base_lr = args.lr
     warmup_lr = args.warmup_lr
 
     optimizer = optim.AdamW(model.model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=3
-    )
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
     best_val_loss = float('inf')
     early_stop_counter = 0
@@ -44,7 +35,7 @@ def train(model, train_loader, val_loader, device, args):
         writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
     for epoch in range(args.epochs):
-        # --- Warmup ---
+        # --- Warmup phase ---
         if epoch == args.warmup_epochs:
             for param in model.parameters():
                 param.requires_grad = True
@@ -53,16 +44,33 @@ def train(model, train_loader, val_loader, device, args):
         # --- Training ---
         model.train()
         running_loss, running_acc = 0.0, 0.0
+
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
             optimizer.zero_grad()
+
             outputs = model(imgs)
-            loss = criterion(outputs, labels)
+
+            # Compute loss
+            if args.edl:
+                loss = evidential_loss(
+                    alpha=outputs,
+                    target=labels,
+                    num_classes=outputs.shape[1],
+                    epoch=epoch,
+                    annealing_epochs=10,
+                    lambda_reg=0.001
+                )
+                probs = outputs / torch.sum(outputs, dim=1, keepdim=True)
+            else:
+                loss = nn.CrossEntropyLoss()(outputs, labels)
+                probs = torch.softmax(outputs, dim=1)
+
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item() * imgs.size(0)
-            running_acc += accuracy(outputs, labels) * imgs.size(0)
+            running_acc += accuracy(probs, labels) * imgs.size(0)
 
         epoch_loss = running_loss / len(train_loader.dataset)
         epoch_acc = running_acc / len(train_loader.dataset)
@@ -70,13 +78,28 @@ def train(model, train_loader, val_loader, device, args):
         # --- Validation ---
         model.eval()
         val_loss, val_acc = 0.0, 0.0
+
         with torch.no_grad():
             for imgs, labels in val_loader:
                 imgs, labels = imgs.to(device), labels.to(device)
                 outputs = model(imgs)
-                loss = criterion(outputs, labels)
+
+                if args.edl:
+                    loss = evidential_loss(
+                        alpha=outputs,
+                        target=labels,
+                        num_classes=outputs.shape[1],
+                        epoch=epoch,
+                        annealing_epochs=10,
+                        lambda_reg=0.001
+                    )
+                    probs = outputs / torch.sum(outputs, dim=1, keepdim=True)
+                else:
+                    loss = nn.CrossEntropyLoss()(outputs, labels)
+                    probs = torch.softmax(outputs, dim=1)
+
                 val_loss += loss.item() * imgs.size(0)
-                val_acc += accuracy(outputs, labels) * imgs.size(0)
+                val_acc += accuracy(probs, labels) * imgs.size(0)
 
         val_loss /= len(val_loader.dataset)
         val_acc /= len(val_loader.dataset)
