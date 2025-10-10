@@ -26,7 +26,7 @@ python -m classification.scripts.train \
     --warmup_lr 1e-3 \
     --warmup_epochs 5 \
     --dropout 0.5 \
-    --early_stop_patience 7 \
+    --early_stop_patience 1 \
     --output_dir "$TRAIN_DIR" \
     --edl
 
