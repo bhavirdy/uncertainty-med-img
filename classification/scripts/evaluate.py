@@ -2,107 +2,98 @@ import argparse
 import json
 import os
 import torch
-import numpy as np
 
-from classification.models.resnet import ResNet50MC
+from classification.models.resnet import ResNet50
+from classification.models.resnet_edl import ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import (
     accuracy, precision, recall, f1, auroc, aupr,
     ece, mce, brier, nll
 )
+from classification.utils.uncertainty import mcdo_predictions, predictive_mean
 from classification.utils.visualisations import (
-    reliability_diagram, predictive_entropy_histogram
+    reliability_diagram_from_probs, predictive_entropy_histogram_from_probs
 )
 
-def evaluate(model, test_loader, device, args):
-    """Evaluate a model and return performance metrics."""
+def evaluate(model, test_loader, device, method, mc_samples):
     model = model.to(device)
     model.eval()
 
-    all_labels, all_preds = [], []
+    all_labels, all_probs = [], []
 
     with torch.no_grad():
         for imgs, labels in test_loader:
             imgs, labels = imgs.to(device), labels.to(device)
-            outputs = model(imgs)
-            all_labels.append(labels)
-            all_preds.append(outputs)
+
+            if method == "deterministic":
+                probs = torch.softmax(model(imgs), dim=1)
+
+            elif method == "mcdo":
+                pred_samples = mcdo_predictions(model, imgs, n_samples=mc_samples)
+                probs = predictive_mean(pred_samples)
+
+            elif method == "edl":
+                alpha = model(imgs)
+                probs = alpha / alpha.sum(dim=1, keepdim=True)
+
+            else:
+                raise ValueError(f"Unknown method {method}")
+
+            all_labels.append(labels.cpu())
+            all_probs.append(probs.cpu())
 
     all_labels = torch.cat(all_labels)
-    all_preds = torch.cat(all_preds)
+    all_probs = torch.cat(all_probs)
 
+    # --- Standard performance metrics ---
     metrics = {
-        "accuracy": {
-            "macro": float(accuracy(all_preds, all_labels)),
-            "per_class": accuracy(all_preds, all_labels, per_class=True)
-        },
-        "precision": {
-            "macro": float(precision(all_preds, all_labels)),
-            "per_class": precision(all_preds, all_labels, per_class=True)
-        },
-        "recall": {
-            "macro": float(recall(all_preds, all_labels)),
-            "per_class": recall(all_preds, all_labels, per_class=True)
-        },
-        "f1": {
-            "macro": float(f1(all_preds, all_labels)),
-            "per_class": f1(all_preds, all_labels, per_class=True)
-        },
-        "auroc": {
-            "macro": float(auroc(all_preds, all_labels)),
-            "per_class": auroc(all_preds, all_labels, per_class=True)
-        },
-        "aupr": {
-            "macro": float(aupr(all_preds, all_labels)),
-            "per_class": aupr(all_preds, all_labels, per_class=True)
-        },
-        "ece": float(ece(all_preds, all_labels)),
-        "mce": float(mce(all_preds, all_labels)),
-        "brier": float(brier(all_preds, all_labels)),
-        "nll": float(nll(all_preds, all_labels))
+        "accuracy": float(accuracy(all_probs, all_labels)),
+        "precision": float(precision(all_probs, all_labels)),
+        "recall": float(recall(all_probs, all_labels)),
+        "f1": float(f1(all_probs, all_labels)),
+        "auroc": float(auroc(all_probs, all_labels)),
+        "aupr": float(aupr(all_probs, all_labels)),
     }
 
-    # --- Save metrics ---
-    save_metrics(metrics, args.output_dir)
+    # --- Uncertainty metrics ---
+    metrics.update({
+        "ece": ece(all_probs, all_labels),
+        "mce": mce(all_probs, all_labels),
+        "brier": brier(all_probs, all_labels),
+        "nll": nll(all_probs, all_labels)
+    })
 
-    # --- Generate plots ---
-    reliability_diagram(
-        all_preds, all_labels,
-        output_path=os.path.join(args.output_dir, "reliability.png")
-    )
-    predictive_entropy_histogram(
-        all_preds,
-        output_path=os.path.join(args.output_dir, "entropy_hist.png")
-    )
+    return metrics, all_probs, all_labels
 
-def save_metrics(metrics, output_dir):
-    """Save evaluation metrics as a JSON file."""
-    def convert(o):
-        if isinstance(o, (np.ndarray, torch.Tensor)):
-            return o.tolist()
-        return o
-
+def save_metrics(metrics, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
-    metrics_path = os.path.join(output_dir, "metrics.json")
-    with open(metrics_path, "w") as f:
-        json.dump(metrics, f, indent=4, default=convert)
-    print(f"Metrics saved to {metrics_path}")
+    path = os.path.join(output_dir, f"metrics_{method}.json")
+    with open(path, "w") as f:
+        json.dump(metrics, f, indent=4)
+    print(f"Metrics for {method} saved to {path}")
+
+def generate_plots(all_probs, all_labels, output_dir, method):
+    os.makedirs(output_dir, exist_ok=True)
+    reliability_diagram_from_probs(all_probs, all_labels,
+                                   output_path=os.path.join(output_dir, f"{method}_reliability.png"))
+    predictive_entropy_histogram_from_probs(all_probs,
+                                            output_path=os.path.join(output_dir, f"{method}_entropy_hist.png"))
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate a trained ResNet50 model")
+    parser = argparse.ArgumentParser(description="Evaluate a trained model with uncertainty metrics")
 
-    parser.add_argument("--dataset", type=str, required=True, choices=["aptos2019", "isic2018"], help="Dataset name")
-    parser.add_argument("--model_path", type=str, required=True, help="Path to trained model (.pth)")
-    parser.add_argument("--output_dir", type=str, required=True, help="Directory to save metrics and plots")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for evaluation")
-    parser.add_argument("--num_workers", type=int, default=8, help="Dataloader workers")
-    parser.add_argument("--dropout", type=float, default=0.5, help="Dropout probability")
+    parser.add_argument("--dataset", type=str, required=True, choices=["aptos2019", "isic2018"])
+    parser.add_argument("--model_path", type=str, required=True)
+    parser.add_argument("--output_dir", type=str, required=True)
+    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--dropout", type=float, default=0.5)
+    parser.add_argument("--mc_samples", type=int, default=20)
     args = parser.parse_args()
 
-    # --- Device setup ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
 
     # --- Load dataset ---
     if args.dataset.lower() == "aptos2019":
@@ -113,13 +104,18 @@ def main():
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Load model ---
-    model = ResNet50MC(num_classes=num_classes, weights=None, dropout_p=args.dropout)
+    if args.method == "edl":
+        model = ResNet50EDL(num_classes=num_classes, dropout_p=args.dropout)
+    else:
+        model = ResNet50(num_classes=num_classes, dropout_p=args.dropout)
+
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
 
     # --- Evaluate ---
-    evaluate(model, test_loader, device, args)
-    print("Evaluation complete.")
+    metrics, all_probs, all_labels = evaluate(model, test_loader, device, method=args.method, mc_samples=args.mc_samples)
+    save_metrics(metrics, args.output_dir, args.method)
+    generate_plots(all_probs, all_labels, args.output_dir, args.method)
 
 if __name__ == "__main__":
     main()

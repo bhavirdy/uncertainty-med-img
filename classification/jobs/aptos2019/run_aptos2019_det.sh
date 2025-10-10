@@ -1,27 +1,23 @@
 #!/bin/bash
-#SBATCH --job-name=aptos_run
-#SBATCH --output=logs/aptos_%j.out
-#SBATCH --error=logs/aptos_%j.err
+#SBATCH --job-name=aptos2019_det
+#SBATCH --output=logs/aptos2019_det_%j.out
+#SBATCH --error=logs/aptos2019_det_%j.err
 #SBATCH --partition=stampede
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 
-# --- Load conda environment ---
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
-# --- Run directories ---
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./classification/results/aptos2019/run_${TIMESTAMP}"
+RUN_DIR="./classification/results/aptos2019/deterministic/run_${TIMESTAMP}"
 TRAIN_DIR="$RUN_DIR/train"
 EVAL_DIR="$RUN_DIR/eval"
-INFER_DIR="$RUN_DIR/inference"
-mkdir -p "$TRAIN_DIR" "$EVAL_DIR" "$INFER_DIR" logs
+mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
 # --- Train ---
-echo "Starting training..."
 python -m classification.scripts.train \
     --dataset aptos2019 \
     --epochs 30 \
@@ -34,29 +30,14 @@ python -m classification.scripts.train \
     --early_stop_patience 7 \
     --output_dir "$TRAIN_DIR"
 
-# --- Model path ---
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
 # --- Evaluate ---
-echo "Starting evaluation..."
 python -m classification.scripts.evaluate \
     --dataset aptos2019 \
+    --method deterministic \
     --model_path "$MODEL_PATH" \
     --batch_size 32 \
     --num_workers 8 \
     --dropout 0.5 \
     --output_dir "$EVAL_DIR"
-
-# --- Uncertainty Inference ---
-echo "Starting uncertainty inference..."
-python -m classification.scripts.ue_inference \
-    --dataset aptos2019 \
-    --model_path "$MODEL_PATH" \
-    --batch_size 32 \
-    --num_workers 8 \
-    --dropout 0.5 \
-    --mc_samples 20 \
-    --output_dir "$INFER_DIR"
-
-echo "✅ Run completed successfully."
-echo "📂 All results saved in: $RUN_DIR"

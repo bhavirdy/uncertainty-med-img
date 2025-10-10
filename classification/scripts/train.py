@@ -7,24 +7,22 @@ import csv
 import wandb
 from torchvision.models import ResNet50_Weights
 
-from classification.models.resnet import ResNet50MC
+from classification.models.resnet import ResNet50
+from classification.models.resnet_edl import ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import accuracy
+from classification.utils.edl_loss import evidential_loss
 
 def train(model, train_loader, val_loader, device, args):
     """Train the model using specified arguments."""
-
     model = model.to(device)
-    criterion = nn.CrossEntropyLoss()
 
     base_lr = args.lr
     warmup_lr = args.warmup_lr
 
     optimizer = optim.AdamW(model.model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=3
-    )
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
     best_val_loss = float('inf')
     early_stop_counter = 0
@@ -37,7 +35,7 @@ def train(model, train_loader, val_loader, device, args):
         writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
     for epoch in range(args.epochs):
-        # --- Warmup ---
+        # --- Warmup phase ---
         if epoch == args.warmup_epochs:
             for param in model.parameters():
                 param.requires_grad = True
@@ -46,16 +44,33 @@ def train(model, train_loader, val_loader, device, args):
         # --- Training ---
         model.train()
         running_loss, running_acc = 0.0, 0.0
+
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
             optimizer.zero_grad()
+
             outputs = model(imgs)
-            loss = criterion(outputs, labels)
+
+            # Compute loss
+            if args.edl:
+                loss = evidential_loss(
+                    alpha=outputs,
+                    target=labels,
+                    num_classes=outputs.shape[1],
+                    epoch=epoch,
+                    annealing_epochs=10,
+                    lambda_reg=0.001
+                )
+                probs = outputs / torch.sum(outputs, dim=1, keepdim=True)
+            else:
+                loss = nn.CrossEntropyLoss()(outputs, labels)
+                probs = torch.softmax(outputs, dim=1)
+
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item() * imgs.size(0)
-            running_acc += accuracy(outputs, labels) * imgs.size(0)
+            running_acc += accuracy(probs, labels) * imgs.size(0)
 
         epoch_loss = running_loss / len(train_loader.dataset)
         epoch_acc = running_acc / len(train_loader.dataset)
@@ -63,13 +78,28 @@ def train(model, train_loader, val_loader, device, args):
         # --- Validation ---
         model.eval()
         val_loss, val_acc = 0.0, 0.0
+
         with torch.no_grad():
             for imgs, labels in val_loader:
                 imgs, labels = imgs.to(device), labels.to(device)
                 outputs = model(imgs)
-                loss = criterion(outputs, labels)
+
+                if args.edl:
+                    loss = evidential_loss(
+                        alpha=outputs,
+                        target=labels,
+                        num_classes=outputs.shape[1],
+                        epoch=epoch,
+                        annealing_epochs=10,
+                        lambda_reg=0.001
+                    )
+                    probs = outputs / torch.sum(outputs, dim=1, keepdim=True)
+                else:
+                    loss = nn.CrossEntropyLoss()(outputs, labels)
+                    probs = torch.softmax(outputs, dim=1)
+
                 val_loss += loss.item() * imgs.size(0)
-                val_acc += accuracy(outputs, labels) * imgs.size(0)
+                val_acc += accuracy(probs, labels) * imgs.size(0)
 
         val_loss /= len(val_loader.dataset)
         val_acc /= len(val_loader.dataset)
@@ -84,9 +114,9 @@ def train(model, train_loader, val_loader, device, args):
             writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
 
         wandb.log({
+            "epoch": epoch + 1,
             "train_loss": epoch_loss,
             "train_acc": epoch_acc,
-            "epoch": epoch + 1,
             "val_loss": val_loss,
             "val_acc": val_acc
         })
@@ -129,6 +159,8 @@ def main():
     parser.add_argument('--warmup_epochs', type=int, default=5, help='Warmup epochs')
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability')
     parser.add_argument('--early_stop_patience', type=int, default=7, help='Early stopping patience')
+    parser.add_argument('--edl', action='store_true', help='Use Evidential Deep Learning loss')
+
     args = parser.parse_args()
 
     # --- Device setup ---
@@ -144,15 +176,22 @@ def main():
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Model ---
-    model = ResNet50MC(
-        num_classes=num_classes,
-        weights=ResNet50_Weights.DEFAULT,
-        dropout_p=args.dropout
-    )
+    if args.edl:
+        model = ResNet50EDL(
+            num_classes=num_classes,
+            weights=ResNet50_Weights.DEFAULT,
+            dropout_p=args.dropout
+        )
+    else:
+        model = ResNet50(
+            num_classes=num_classes,
+            weights=ResNet50_Weights.DEFAULT,
+            dropout_p=args.dropout
+        )
 
     # --- WandB init ---
     wandb.init(
-        project="resnet50-" + args.dataset.lower(),
+        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
         config=vars(args)
     )
 
