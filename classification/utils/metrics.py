@@ -7,61 +7,41 @@ from sklearn.metrics import precision_score, recall_score, f1_score, log_loss, r
 # Performance metrics
 # ------------------------------
 
-def accuracy(probs, labels, per_class=False):
+def accuracy(probs, labels):
     preds = torch.argmax(probs, dim=1)
     correct = (preds == labels)
+    return correct.float().mean().item()
 
-    if not per_class:
-        return correct.float().mean().item()
-
-    # Per-class accuracy
-    n_classes = probs.size(1)
-    accs = []
-    for c in range(n_classes):
-        mask = (labels == c)
-        if mask.sum().item() > 0:
-            accs.append(correct[mask].float().mean().item())
-        else:
-            accs.append(float('nan'))
-    return accs
-
-def precision(probs, labels, per_class=False):
+def precision(probs, labels):
     preds = torch.argmax(probs, dim=1)
-    average = None if per_class else 'macro'
     return precision_score(labels.cpu().numpy(), preds.cpu().numpy(),
-                           average=average, zero_division=0)
+                           average='macro', zero_division=0)
 
-def recall(probs, labels, per_class=False):
+def recall(probs, labels):
     preds = torch.argmax(probs, dim=1)
-    average = None if per_class else 'macro'
     return recall_score(labels.cpu().numpy(), preds.cpu().numpy(),
-                        average=average, zero_division=0)
+                        average='macro', zero_division=0)
 
-def f1(probs, labels, per_class=False):
+def f1(probs, labels):
     preds = torch.argmax(probs, dim=1)
-    average = None if per_class else 'macro'
     return f1_score(labels.cpu().numpy(), preds.cpu().numpy(),
-                    average=average, zero_division=0)
+                    average='macro', zero_division=0)
 
-def auroc(probs, labels, per_class=False):
+def auroc(probs, labels):
     y_true = F.one_hot(labels, num_classes=probs.size(1)).cpu().numpy()
     y_scores = probs.cpu().numpy()
     try:
-        if per_class:
-            return roc_auc_score(y_true, y_scores, average=None, multi_class='ovr').tolist()
         return roc_auc_score(y_true, y_scores, average='macro', multi_class='ovr')
     except ValueError:
-        return float('nan') if not per_class else [float('nan')] * probs.size(1)
+        return float('nan')
 
-def aupr(probs, labels, per_class=False):
+def aupr(probs, labels):
     y_true = F.one_hot(labels, num_classes=probs.size(1)).cpu().numpy()
     y_scores = probs.cpu().numpy()
     try:
-        if per_class:
-            return average_precision_score(y_true, y_scores, average=None).tolist()
         return average_precision_score(y_true, y_scores, average='macro')
     except ValueError:
-        return float('nan') if not per_class else [float('nan')] * probs.size(1)
+        return float('nan')
 
 # ------------------------------
 # Uncertainty / calibration metrics
