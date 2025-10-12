@@ -11,7 +11,7 @@ from segmentation.utils.segmentation_metrics import (
     segmentation_mce, segmentation_nll, segmentation_brier
 )
 from segmentation.utils.segmentation_uncertainty import (
-    mcdo_segmentation_predictions, segmentation_predictive_mean,
+    mcdo_segmentation_predictions, segmentation_predictive_mean, segmentation_predictive_variance,
     edl_segmentation_predictions, edl_segmentation_uncertainty
 )
 from segmentation.utils.segmentation_visualizations import (
