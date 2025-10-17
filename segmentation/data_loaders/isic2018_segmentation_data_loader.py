@@ -41,7 +41,7 @@ class ISIC2018SegmentationDataset(Dataset):
         return image, mask
 
 def get_isic2018_segmentation_loaders(
-        root="./segmentation/datasets/isic2018",
+        root="./segmentation/datasets/isic2018seg",
         batch_size=32,
         input_size=224,
         num_workers=8
