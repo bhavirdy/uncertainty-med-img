@@ -1,38 +1,41 @@
 import torch
-from torch.utils.data import DataLoader, Dataset
-import pandas as pd
+from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 import os
 import numpy as np
 
 class ISIC2018SegmentationDataset(Dataset):
-    def __init__(self, csv_file, img_dir, mask_dir, transform=None, mask_transform=None):
-        self.data = pd.read_csv(csv_file)
+    def __init__(self, img_dir, mask_dir, transform=None, mask_transform=None):
         self.img_dir = img_dir
         self.mask_dir = mask_dir
         self.transform = transform
         self.mask_transform = mask_transform
 
+        # Match images and masks by ID
+        self.image_names = sorted([
+            os.path.splitext(f)[0]
+            for f in os.listdir(img_dir)
+            if f.endswith(".jpg")
+        ])
+
     def __len__(self):
-        return len(self.data)
+        return len(self.image_names)
 
     def __getitem__(self, idx):
-        row = self.data.iloc[idx]
-        img_path = os.path.join(self.img_dir, row["image"] + ".jpg")
-        mask_path = os.path.join(self.mask_dir, row["image"] + "_segmentation.png")
+        img_id = self.image_names[idx]
+        img_path = os.path.join(self.img_dir, img_id + ".jpg")
+        mask_path = os.path.join(self.mask_dir, img_id + "_segmentation.png")
 
-        # Load image
+        # Load image and mask
         image = Image.open(img_path).convert("RGB")
-        
-        # Load mask
-        mask = Image.open(mask_path).convert("L")  # Grayscale mask
-        mask = np.array(mask)
-        
-        # Convert mask to binary (0: background, 1: lesion)
-        mask = (mask > 128).astype(np.uint8)
+        mask = Image.open(mask_path).convert("L")
+
+        # Convert mask to binary (0 = background, 1 = lesion)
+        mask = (np.array(mask) > 128).astype(np.uint8)
         mask = Image.fromarray(mask)
 
+        # Apply transforms
         if self.transform:
             image = self.transform(image)
         if self.mask_transform:
@@ -47,17 +50,13 @@ def get_isic2018_segmentation_loaders(
         num_workers=8
     ):
     
-    train_csv = os.path.join(root, "training_gt", "training_gt.csv")
-    val_csv = os.path.join(root, "validation_gt", "validation_gt.csv")
-    test_csv = os.path.join(root, "test_gt", "test_gt.csv")
-
     train_img_dir = os.path.join(root, "training_input")
     val_img_dir = os.path.join(root, "validation_input")
     test_img_dir = os.path.join(root, "test_input")
     
-    train_mask_dir = os.path.join(root, "training_masks")
-    val_mask_dir = os.path.join(root, "validation_masks")
-    test_mask_dir = os.path.join(root, "test_masks")
+    train_mask_dir = os.path.join(root, "training_gt")
+    val_mask_dir = os.path.join(root, "validation_gt")
+    test_mask_dir = os.path.join(root, "test_gt")
 
     # Transforms for images
     train_img_tf = transforms.Compose([
@@ -95,11 +94,11 @@ def get_isic2018_segmentation_loaders(
     ])
 
     # Datasets
-    train_set = ISIC2018SegmentationDataset(train_csv, train_img_dir, train_mask_dir, 
+    train_set = ISIC2018SegmentationDataset(train_img_dir, train_mask_dir, 
                                            transform=train_img_tf, mask_transform=train_mask_tf)
-    val_set = ISIC2018SegmentationDataset(val_csv, val_img_dir, val_mask_dir, 
+    val_set = ISIC2018SegmentationDataset(val_img_dir, val_mask_dir, 
                                          transform=val_img_tf, mask_transform=val_mask_tf)
-    test_set = ISIC2018SegmentationDataset(test_csv, test_img_dir, test_mask_dir, 
+    test_set = ISIC2018SegmentationDataset(test_img_dir, test_mask_dir, 
                                           transform=val_img_tf, mask_transform=val_mask_tf)
 
     # Loaders
