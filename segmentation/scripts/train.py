@@ -152,14 +152,9 @@ def train(model, train_loader, val_loader, device, args):
         wandb.log({
             'epoch': epoch,
             'train_loss': train_loss,
-            'train_dice': train_dice,
             'train_iou': train_iou,
-            'train_acc': train_acc,
             'val_loss': val_loss,
-            'val_dice': val_dice,
             'val_iou': val_iou,
-            'val_acc': val_acc,
-            'lr': optimizer.param_groups[0]['lr']
         })
         
         print(f'Epoch {epoch}: Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}, '
