@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 import wandb
-from tqdm import tqdm
 
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_segmentation_loaders
@@ -18,18 +17,19 @@ def train_epoch(model, train_loader, device, optimizer, epoch, args):
     total_dice = 0
     total_iou = 0
     total_acc = 0
-    
-    pbar = tqdm(train_loader, desc=f'Epoch {epoch}')
-    for batch_idx, (images, masks) in enumerate(pbar):
+
+    for batch_idx, (images, masks) in enumerate(train_loader):
         images, masks = images.to(device), masks.to(device)
-        
+
         optimizer.zero_grad()
-        
+
         if args.edl:
             alpha = model(images)
-            loss = evidential_segmentation_loss(alpha, masks, args.num_classes, epoch, 
-                                              annealing_epochs=args.annealing_epochs)
-            
+            loss = evidential_segmentation_loss(
+                alpha, masks, args.num_classes, epoch,
+                annealing_epochs=args.annealing_epochs
+            )
+
             # Convert alpha to probabilities for metrics
             S = alpha.sum(dim=1, keepdim=True)
             probs = alpha / S
@@ -38,32 +38,32 @@ def train_epoch(model, train_loader, device, optimizer, epoch, args):
             logits = model(images)
             loss = combined_loss(logits, masks, alpha=0.5)
             probs = torch.softmax(logits, dim=1)
-        
+
         loss.backward()
         optimizer.step()
-        
+
         # Compute metrics
         dice = dice_score(logits, masks)
         iou = iou_score(logits, masks)
         acc = pixel_accuracy(logits, masks)
-        
+
         total_loss += loss.item()
         total_dice += dice
         total_iou += iou
         total_acc += acc
-        
-        pbar.set_postfix({
-            'Loss': f'{loss.item():.4f}',
-            'Dice': f'{dice:.4f}',
-            'IoU': f'{iou:.4f}',
-            'Acc': f'{acc:.4f}'
-        })
-    
+
+        # Print occasional updates
+        if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(train_loader):
+            print(
+                f"Epoch [{epoch}] Batch [{batch_idx + 1}/{len(train_loader)}] "
+                f"Loss: {loss.item():.4f} | Dice: {dice:.4f} | IoU: {iou:.4f} | Acc: {acc:.4f}"
+            )
+
     avg_loss = total_loss / len(train_loader)
     avg_dice = total_dice / len(train_loader)
     avg_iou = total_iou / len(train_loader)
     avg_acc = total_acc / len(train_loader)
-    
+
     return avg_loss, avg_dice, avg_iou, avg_acc
 
 def validate_epoch(model, val_loader, device, epoch, args):
@@ -72,17 +72,18 @@ def validate_epoch(model, val_loader, device, epoch, args):
     total_dice = 0
     total_iou = 0
     total_acc = 0
-    
+
     with torch.no_grad():
-        pbar = tqdm(val_loader, desc=f'Validation {epoch}')
-        for images, masks in pbar:
+        for batch_idx, (images, masks) in enumerate(val_loader):
             images, masks = images.to(device), masks.to(device)
-            
+
             if args.edl:
                 alpha = model(images)
-                loss = evidential_segmentation_loss(alpha, masks, args.num_classes, epoch,
-                                                  annealing_epochs=args.annealing_epochs)
-                
+                loss = evidential_segmentation_loss(
+                    alpha, masks, args.num_classes, epoch,
+                    annealing_epochs=args.annealing_epochs
+                )
+
                 # Convert alpha to probabilities for metrics
                 S = alpha.sum(dim=1, keepdim=True)
                 probs = alpha / S
@@ -90,29 +91,29 @@ def validate_epoch(model, val_loader, device, epoch, args):
             else:
                 logits = model(images)
                 loss = combined_loss(logits, masks, alpha=0.5)
-            
+
             # Compute metrics
             dice = dice_score(logits, masks)
             iou = iou_score(logits, masks)
             acc = pixel_accuracy(logits, masks)
-            
+
             total_loss += loss.item()
             total_dice += dice
             total_iou += iou
             total_acc += acc
-            
-            pbar.set_postfix({
-                'Loss': f'{loss.item():.4f}',
-                'Dice': f'{dice:.4f}',
-                'IoU': f'{iou:.4f}',
-                'Acc': f'{acc:.4f}'
-            })
-    
+
+            # Print occasional updates
+            if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(val_loader):
+                print(
+                    f"Validation [{epoch}] Batch [{batch_idx + 1}/{len(val_loader)}] "
+                    f"Loss: {loss.item():.4f} | Dice: {dice:.4f} | IoU: {iou:.4f} | Acc: {acc:.4f}"
+                )
+
     avg_loss = total_loss / len(val_loader)
     avg_dice = total_dice / len(val_loader)
     avg_iou = total_iou / len(val_loader)
     avg_acc = total_acc / len(val_loader)
-    
+
     return avg_loss, avg_dice, avg_iou, avg_acc
 
 def train(model, train_loader, val_loader, device, args):
