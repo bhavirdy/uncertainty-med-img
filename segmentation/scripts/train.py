@@ -119,8 +119,11 @@ def validate_epoch(model, val_loader, device, epoch, args):
 def train(model, train_loader, val_loader, device, args):
     # Initialize wandb
     wandb.init(
-        project="segmentation-uncertainty",
-        name=f"{args.dataset}_{'edl' if args.edl else 'deterministic'}_{args.timestamp}",
+        project=f"unet-{args.dataset.lower()}{'-edl' if args.edl else ''}",    
+        config=vars(args)
+    )
+    wandb.init(
+        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
         config=vars(args)
     )
     
