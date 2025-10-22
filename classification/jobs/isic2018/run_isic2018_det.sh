@@ -19,14 +19,14 @@ mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
 python -m classification.scripts.train \
     --dataset isic2018 \
-    --epochs 200 \
+    --epochs 30 \
     --batch_size 32 \
     --num_workers 8 \
     --lr 1e-4 \
     --warmup_lr 1e-3 \
     --warmup_epochs 5 \
     --dropout 0.5 \
-    --early_stop_patience 50 \
+    --early_stop_patience 10 \
     --output_dir "$TRAIN_DIR"
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
