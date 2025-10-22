@@ -122,10 +122,6 @@ def train(model, train_loader, val_loader, device, args):
         project=f"unet-{args.dataset.lower()}{'-edl' if args.edl else ''}",    
         config=vars(args)
     )
-    wandb.init(
-        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
-        config=vars(args)
-    )
     
     # Optimizer and scheduler
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
