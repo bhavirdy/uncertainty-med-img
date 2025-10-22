@@ -40,6 +40,7 @@ class ISIC2018SegmentationDataset(Dataset):
             image = self.transform(image)
         if self.mask_transform:
             mask = self.mask_transform(mask)
+            mask = mask.squeeze(0)
 
         return image, mask
 
