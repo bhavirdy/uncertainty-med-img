@@ -11,8 +11,8 @@ def dice_score(pred, target, smooth=1e-6):
     target = target.float()
     
     # Flatten spatial dimensions
-    pred = pred.view(-1)
-    target = target.view(-1)
+    pred = pred.reshape(-1)
+    target = target.reshape(-1)
     
     intersection = (pred * target).sum()
     dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
@@ -27,8 +27,8 @@ def iou_score(pred, target, smooth=1e-6):
     target = target.float()
     
     # Flatten spatial dimensions
-    pred = pred.view(-1)
-    target = target.view(-1)
+    pred = pred.reshape(-1)
+    target = target.reshape(-1)
     
     intersection = (pred * target).sum()
     union = pred.sum() + target.sum() - intersection
