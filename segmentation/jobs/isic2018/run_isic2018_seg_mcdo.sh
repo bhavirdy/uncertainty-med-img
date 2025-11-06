@@ -23,7 +23,6 @@ python -m segmentation.scripts.train \
     --batch_size 16 \
     --num_workers 8 \
     --lr 1e-4 \
-    --warmup_epochs 10 \
     --dropout 0.5 \
     --early_stop_patience 20 \
     --output_dir "$TRAIN_DIR" \

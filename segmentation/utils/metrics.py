@@ -1,48 +1,8 @@
 import torch
-import torch.nn.functional as F
 import numpy as np
 from sklearn.metrics import log_loss
 
-def dice_score(pred, target, smooth=1e-6):
-    """Dice score for segmentation"""
-    pred = torch.softmax(pred, dim=1)
-    pred = pred[:, 1]  # Get foreground class
-    
-    target = target.float()
-    
-    # Flatten spatial dimensions
-    pred = pred.reshape(-1)
-    target = target.reshape(-1)
-    
-    intersection = (pred * target).sum()
-    dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
-    
-    return dice.item()
-
-def iou_score(pred, target, smooth=1e-6):
-    """Intersection over Union (IoU) score"""
-    pred = torch.softmax(pred, dim=1)
-    pred = pred[:, 1]  # Get foreground class
-    
-    target = target.float()
-    
-    # Flatten spatial dimensions
-    pred = pred.reshape(-1)
-    target = target.reshape(-1)
-    
-    intersection = (pred * target).sum()
-    union = pred.sum() + target.sum() - intersection
-    iou = (intersection + smooth) / (union + smooth)
-    
-    return iou.item()
-
-def pixel_accuracy(pred, target):
-    """Pixel-wise accuracy"""
-    pred = torch.argmax(pred, dim=1)
-    correct = (pred == target.long()).float()
-    return correct.mean().item()
-
-def segmentation_ece(probs, labels, n_bins=15):
+def ece(probs, labels, n_bins=15):
     """Expected Calibration Error for segmentation"""
     # Flatten spatial dimensions
     probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
@@ -72,7 +32,7 @@ def segmentation_ece(probs, labels, n_bins=15):
     
     return ece_val.item()
 
-def segmentation_mce(probs, labels, n_bins=15):
+def mce(probs, labels, n_bins=15):
     """Maximum Calibration Error for segmentation"""
     # Flatten spatial dimensions
     probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
@@ -102,7 +62,7 @@ def segmentation_mce(probs, labels, n_bins=15):
     
     return max(errors) if errors else 0.0
 
-def segmentation_nll(probs, labels):
+def nll(probs, labels):
     """Negative log-likelihood for segmentation"""
     probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
     labels_flat = labels.reshape(labels.size(0), -1)  # [B, H*W]
@@ -116,7 +76,7 @@ def segmentation_nll(probs, labels):
     
     return float(log_loss(labels_np, probs_np, labels=[0, 1]))
 
-def segmentation_brier(probs, labels):
+def brier(probs, labels):
     """Brier score for segmentation"""
     probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
     labels_flat = labels.reshape(labels.size(0), -1)  # [B, H*W]

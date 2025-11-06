@@ -8,15 +8,13 @@ import wandb
 
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
-from segmentation.utils.segmentation_loss import bce_loss, evidential_segmentation_loss
-from segmentation.utils.segmentation_metrics import dice_score, iou_score, pixel_accuracy
+from segmentation.utils.evidential_loss import evidential_segmentation_loss
+from torchmetrics.classification import MulticlassJaccardIndex, MulticlassF1Score, MulticlassAccuracy
 
-def train_epoch(model, train_loader, device, optimizer, epoch, args):
+def train_epoch(model, train_loader, device, optimizer, epoch, args, dice_metric, iou_metric, acc_metric):
     model.train()
     total_loss = 0
-    total_dice = 0
-    total_iou = 0
-    total_acc = 0
+    criterion = nn.CrossEntropyLoss()
 
     for batch_idx, (images, masks) in enumerate(train_loader):
         images, masks = images.to(device), masks.to(device)
@@ -36,35 +34,37 @@ def train_epoch(model, train_loader, device, optimizer, epoch, args):
             logits = torch.log(probs + 1e-8)
         else:
             logits = model(images)
-            loss = bce_loss(logits, masks)
-            probs = torch.softmax(logits, dim=1)
+            loss = criterion(logits, masks.long())
 
         loss.backward()
         optimizer.step()
 
-        # Compute metrics
-        dice = dice_score(logits, masks)
-        iou = iou_score(logits, masks)
-        acc = pixel_accuracy(logits, masks)
+        # Convert logits to predicted masks
+        preds = torch.argmax(logits, dim=1)
+
+        # Update metrics
+        dice_metric.update(preds, masks)
+        iou_metric.update(preds, masks)
+        acc_metric.update(preds, masks)
 
         total_loss += loss.item()
-        total_dice += dice
-        total_iou += iou
-        total_acc += acc
 
     avg_loss = total_loss / len(train_loader)
-    avg_dice = total_dice / len(train_loader)
-    avg_iou = total_iou / len(train_loader)
-    avg_acc = total_acc / len(train_loader)
+    avg_dice = dice_metric.compute().item()
+    avg_iou = iou_metric.compute().item()
+    avg_acc = acc_metric.compute().item()
+
+    # Reset for next epoch
+    dice_metric.reset()
+    iou_metric.reset()
+    acc_metric.reset()
 
     return avg_loss, avg_dice, avg_iou, avg_acc
 
-def validate_epoch(model, val_loader, device, epoch, args):
+def validate_epoch(model, val_loader, device, epoch, args, dice_metric, iou_metric, acc_metric):
     model.eval()
     total_loss = 0
-    total_dice = 0
-    total_iou = 0
-    total_acc = 0
+    criterion = nn.CrossEntropyLoss()
 
     with torch.no_grad():
         for batch_idx, (images, masks) in enumerate(val_loader):
@@ -76,31 +76,33 @@ def validate_epoch(model, val_loader, device, epoch, args):
                     alpha, masks, args.num_classes, epoch,
                     annealing_epochs=args.annealing_epochs
                 )
-
                 # Convert alpha to probabilities for metrics
                 S = alpha.sum(dim=1, keepdim=True)
                 probs = alpha / S
                 logits = torch.log(probs + 1e-8)
             else:
                 logits = model(images)
-                loss = bce_loss(logits, masks)
+                loss = criterion(logits, masks.long())
 
-            # Compute metrics
-            dice = dice_score(logits, masks)
-            iou = iou_score(logits, masks)
-            acc = pixel_accuracy(logits, masks)
+            # Convert logits to predicted masks
+            preds = torch.argmax(logits, dim=1)
+
+            # Update metrics
+            dice_metric.update(preds, masks)
+            iou_metric.update(preds, masks)
+            acc_metric.update(preds, masks)
 
             total_loss += loss.item()
-            total_dice += dice
-            total_iou += iou
-            total_acc += acc
-
-            # No batch-level printing - only epoch-level
 
     avg_loss = total_loss / len(val_loader)
-    avg_dice = total_dice / len(val_loader)
-    avg_iou = total_iou / len(val_loader)
-    avg_acc = total_acc / len(val_loader)
+    avg_dice = dice_metric.compute().item()
+    avg_iou = iou_metric.compute().item()
+    avg_acc = acc_metric.compute().item()
+
+    # Reset for next epoch
+    dice_metric.reset()
+    iou_metric.reset()
+    acc_metric.reset()
 
     return avg_loss, avg_dice, avg_iou, avg_acc
 
@@ -115,7 +117,11 @@ def train(model, train_loader, val_loader, device, args):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     
     # Learning rate scheduler - ReduceLROnPlateau
-    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10, verbose=True)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10)
+
+    dice_metric = MulticlassF1Score(num_classes=args.num_classes, average='macro').to(device)
+    iou_metric = MulticlassJaccardIndex(num_classes=args.num_classes, average='macro').to(device)
+    acc_metric = MulticlassAccuracy(num_classes=args.num_classes, average='micro').to(device)
     
     best_dice = 0
     patience_counter = 0
@@ -123,12 +129,12 @@ def train(model, train_loader, val_loader, device, args):
     for epoch in range(args.epochs):
         # Training
         train_loss, train_dice, train_iou, train_acc = train_epoch(
-            model, train_loader, device, optimizer, epoch, args
+            model, train_loader, device, optimizer, epoch, args, dice_metric, iou_metric, acc_metric
         )
         
         # Validation
         val_loss, val_dice, val_iou, val_acc = validate_epoch(
-            model, val_loader, device, epoch, args
+            model, val_loader, device, epoch, args, dice_metric, iou_metric, acc_metric
         )
         
         # Learning rate scheduling
@@ -138,9 +144,9 @@ def train(model, train_loader, val_loader, device, args):
         wandb.log({
             'epoch': epoch,
             'train_loss': train_loss,
-            'train_iou': train_iou,
+            'train_dice': train_dice,
             'val_loss': val_loss,
-            'val_iou': val_iou,
+            'val_dice': val_dice,
         })
         
         print(f'Epoch {epoch}: Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}, '
@@ -192,9 +198,7 @@ def main():
 
     # --- Data loaders ---
     if args.dataset.lower() == "isic2018":
-        train_loader, val_loader, _, num_classes = get_isic2018_loaders(
-            batch_size=args.batch_size, num_workers=args.num_workers
-        )
+        train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     else:
         raise ValueError(f"Dataset {args.dataset} not supported.")
 

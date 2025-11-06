@@ -1,13 +1,7 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-def bce_loss(pred, target):
-    """Binary Cross Entropy loss for segmentation"""
-    ce_loss = F.cross_entropy(pred, target.long())
-    return ce_loss
-
-def evidential_segmentation_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
+def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
     """
     Evidential loss adapted for segmentation
     """

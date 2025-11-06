@@ -2,29 +2,27 @@ import argparse
 import json
 import os
 import torch
-import numpy as np
+from torchmetrics.classification import MulticlassJaccardIndex, MulticlassF1Score, MulticlassAccuracy
 
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
-from segmentation.utils.segmentation_metrics import (
-    dice_score, iou_score, pixel_accuracy, segmentation_ece, 
-    segmentation_mce, segmentation_nll, segmentation_brier
-)
-from segmentation.utils.segmentation_uncertainty import (
-    mcdo_segmentation_predictions, segmentation_predictive_mean, segmentation_predictive_variance,
-    edl_segmentation_predictions, edl_segmentation_uncertainty
-)
-from segmentation.utils.segmentation_visualizations import (
+from segmentation.utils.metrics import ece, mce, nll, brier
+from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean, predictive_variance
+from segmentation.utils.visualizations import (
     reliability_diagram_from_probs, predictive_entropy_histogram_from_probs,
     uncertainty_heatmap, aleatoric_epistemic_heatmap
 )
 
-def evaluate(model, test_loader, device, method, mc_samples):
+def evaluate(model, test_loader, device, method, mc_samples, args):
     model = model.to(device)
     model.eval()
 
     all_labels, all_probs = [], []
     all_aleatoric, all_epistemic = [], []
+
+    dice_metric = MulticlassF1Score(num_classes=args.num_classes, average='macro').to(device)
+    iou_metric = MulticlassJaccardIndex().to(device)
+    acc_metric = MulticlassAccuracy().to(device)
 
     with torch.no_grad():
         for imgs, labels in test_loader:
@@ -35,11 +33,11 @@ def evaluate(model, test_loader, device, method, mc_samples):
                 probs = torch.softmax(logits, dim=1)
 
             elif method == "mcdo":
-                pred_samples = mcdo_segmentation_predictions(model, imgs, n_samples=mc_samples)
-                probs = segmentation_predictive_mean(pred_samples)
+                pred_samples = mcdo_predictions(model, imgs, n_samples=mc_samples)
+                probs = predictive_mean(pred_samples)
                 
                 # Compute uncertainty measures
-                epistemic = segmentation_predictive_variance(pred_samples)
+                epistemic = predictive_variance(pred_samples)
                 aleatoric = probs * (1 - probs)
                 all_aleatoric.append(aleatoric.cpu())
                 all_epistemic.append(epistemic.cpu())
@@ -56,8 +54,15 @@ def evaluate(model, test_loader, device, method, mc_samples):
             else:
                 raise ValueError(f"Unknown method {method}")
 
+            preds = torch.argmax(probs, dim=1)
+
             all_labels.append(labels.cpu())
             all_probs.append(probs.cpu())
+
+            # --- Update metrics ---
+            dice_metric.update(preds, labels)
+            iou_metric.update(preds, labels)
+            acc_metric.update(preds, labels)
 
     all_labels = torch.cat(all_labels)
     all_probs = torch.cat(all_probs)
@@ -69,20 +74,24 @@ def evaluate(model, test_loader, device, method, mc_samples):
         all_aleatoric = None
         all_epistemic = None
 
+    dice = dice_metric.compute().item()
+    iou = iou_metric.compute().item()
+    acc = acc_metric.compute().item()
+
+    dice_metric.reset()
+    iou_metric.reset()
+    acc_metric.reset()
+
     # --- Performance metrics ---
     metrics = {
-        "dice": float(dice_score(all_probs, all_labels)),
-        "iou": float(iou_score(all_probs, all_labels)),
-        "pixel_accuracy": float(pixel_accuracy(all_probs, all_labels)),
+        "dice": dice,
+        "iou": iou,
+        "pixel_accuracy": acc,
+        "ece": float(ece(all_probs, all_labels)),
+        "mce": float(mce(all_probs, all_labels)),
+        "nll": float(nll(all_probs, all_labels)),
+        "brier": float(brier(all_probs, all_labels)),
     }
-
-    # --- Uncertainty metrics ---
-    metrics.update({
-        "ece": float(segmentation_ece(all_probs, all_labels)),
-        "mce": float(segmentation_mce(all_probs, all_labels)),
-        "nll": float(segmentation_nll(all_probs, all_labels)),
-        "brier": float(segmentation_brier(all_probs, all_labels)),
-    })
 
     return metrics, all_probs, all_labels, all_aleatoric, all_epistemic
 
@@ -136,6 +145,8 @@ def main():
         )
     else:
         raise ValueError(f"Dataset {args.dataset} not supported.")
+    
+    args.num_classes = num_classes
 
     # --- Load model ---
     if args.method == "edl":
@@ -148,7 +159,7 @@ def main():
 
     # --- Evaluate ---
     metrics, all_probs, all_labels, all_aleatoric, all_epistemic = evaluate(
-        model, test_loader, device, method=args.method, mc_samples=args.mc_samples
+        model, test_loader, device, method=args.method, mc_samples=args.mc_samples, args=args
     )
     
     save_metrics(metrics, args.output_dir, args.method)

@@ -14,18 +14,15 @@ def accuracy(probs, labels):
 
 def precision(probs, labels):
     preds = torch.argmax(probs, dim=1)
-    return precision_score(labels.cpu().numpy(), preds.cpu().numpy(),
-                           average='macro', zero_division=0)
+    return precision_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
 
 def recall(probs, labels):
     preds = torch.argmax(probs, dim=1)
-    return recall_score(labels.cpu().numpy(), preds.cpu().numpy(),
-                        average='macro', zero_division=0)
+    return recall_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
 
 def f1(probs, labels):
     preds = torch.argmax(probs, dim=1)
-    return f1_score(labels.cpu().numpy(), preds.cpu().numpy(),
-                    average='macro', zero_division=0)
+    return f1_score(labels.cpu().numpy(), preds.cpu().numpy(), average='macro', zero_division=0)
 
 def auroc(probs, labels):
     y_true = F.one_hot(labels, num_classes=probs.size(1)).cpu().numpy()
