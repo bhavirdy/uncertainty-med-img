@@ -2,7 +2,7 @@
 #SBATCH --job-name=isic2018_seg_det
 #SBATCH --output=logs/isic2018_seg_det_%j.out
 #SBATCH --error=logs/isic2018_seg_det_%j.err
-#SBATCH --partition=stampede
+#SBATCH --partition=bigbatch
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
