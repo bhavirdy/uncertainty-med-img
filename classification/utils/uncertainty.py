@@ -11,7 +11,7 @@ def mcdo_predictions(model, inputs, n_samples=20):
         for _ in range(n_samples):
             out = torch.softmax(model(inputs), dim=1)
             preds.append(out.unsqueeze(0))
-    return torch.cat(preds, dim=0)  # [S, B, C]
+    return torch.cat(preds, dim=0) 
 
 def predictive_mean(pred_samples):
     """Mean predictive distribution"""

@@ -2,98 +2,67 @@ import argparse
 import json
 import os
 import torch
-from torchmetrics.classification import MulticlassJaccardIndex, MulticlassF1Score, MulticlassAccuracy
+from torchmetrics.classification import JaccardIndex, F1Score, Accuracy, CalibrationError
 
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
-from segmentation.utils.metrics import ece, mce, nll, brier
+from segmentation.utils.metrics import nll, brier
 from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean, predictive_variance
 from segmentation.utils.visualizations import (
     reliability_diagram_from_probs, predictive_entropy_histogram_from_probs,
     uncertainty_heatmap, aleatoric_epistemic_heatmap
 )
 
-def evaluate(model, test_loader, device, method, mc_samples, args):
+def evaluate(model, test_loader, device, args):
     model = model.to(device)
     model.eval()
 
     all_labels, all_probs = [], []
-    all_aleatoric, all_epistemic = [], []
-
-    dice_metric = MulticlassF1Score(num_classes=args.num_classes, average='macro').to(device)
-    iou_metric = MulticlassJaccardIndex().to(device)
-    acc_metric = MulticlassAccuracy().to(device)
 
     with torch.no_grad():
         for imgs, labels in test_loader:
             imgs, labels = imgs.to(device), labels.to(device)
 
-            if method == "deterministic":
+            if args.method == "deterministic":
                 logits = model(imgs)
                 probs = torch.softmax(logits, dim=1)
 
-            elif method == "mcdo":
-                pred_samples = mcdo_predictions(model, imgs, n_samples=mc_samples)
+            elif args.method == "mcdo":
+                pred_samples = mcdo_predictions(model, imgs, n_samples=args.mc_samples)
                 probs = predictive_mean(pred_samples)
-                
-                # Compute uncertainty measures
-                epistemic = predictive_variance(pred_samples)
-                aleatoric = probs * (1 - probs)
-                all_aleatoric.append(aleatoric.cpu())
-                all_epistemic.append(epistemic.cpu())
 
-            elif method == "edl":
+            elif args.method == "edl":
                 alpha = model(imgs)
                 probs = alpha / alpha.sum(dim=1, keepdim=True)
-                
-                # Compute uncertainty measures
-                entropy, aleatoric, epistemic = edl_segmentation_uncertainty(alpha)
-                all_aleatoric.append(aleatoric.cpu())
-                all_epistemic.append(epistemic.cpu())
 
-            else:
-                raise ValueError(f"Unknown method {method}")
-
-            preds = torch.argmax(probs, dim=1)
-
+            # --- Collect all predictions and labels ---
             all_labels.append(labels.cpu())
             all_probs.append(probs.cpu())
 
-            # --- Update metrics ---
-            dice_metric.update(preds, labels)
-            iou_metric.update(preds, labels)
-            acc_metric.update(preds, labels)
-
+    # --- Concatenate all batches ---
     all_labels = torch.cat(all_labels)
     all_probs = torch.cat(all_probs)
-    
-    if all_aleatoric:
-        all_aleatoric = torch.cat(all_aleatoric)
-        all_epistemic = torch.cat(all_epistemic)
-    else:
-        all_aleatoric = None
-        all_epistemic = None
+    preds = torch.argmax(all_probs, dim=1)
 
-    dice = dice_metric.compute().item()
-    iou = iou_metric.compute().item()
-    acc = acc_metric.compute().item()
+    # --- Compute metrics ---
+    dice = F1Score(num_classes=args.num_classes, average='macro')(preds, all_labels).item()
+    iou = JaccardIndex(num_classes=args.num_classes)(preds, all_labels).item()
+    acc = Accuracy(num_classes=args.num_classes)(preds, all_labels).item()
+    ece = CalibrationError(n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs, all_labels).item()
+    mce = CalibrationError(n_bins=15, norm='max', num_classes=args.num_classes)(all_probs, all_labels).item()
 
-    dice_metric.reset()
-    iou_metric.reset()
-    acc_metric.reset()
-
-    # --- Performance metrics ---
+    # --- Store metrics ---
     metrics = {
         "dice": dice,
         "iou": iou,
         "pixel_accuracy": acc,
-        "ece": float(ece(all_probs, all_labels)),
-        "mce": float(mce(all_probs, all_labels)),
+        "ece": ece,
+        "mce": mce,
         "nll": float(nll(all_probs, all_labels)),
         "brier": float(brier(all_probs, all_labels)),
     }
 
-    return metrics, all_probs, all_labels, all_aleatoric, all_epistemic
+    return metrics, all_probs, all_labels
 
 def save_metrics(metrics, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
