@@ -52,8 +52,6 @@ def train_epoch(model, train_loader, device, optimizer, epoch, args):
         total_iou += iou
         total_acc += acc
 
-        # No batch-level printing - only epoch-level
-
     avg_loss = total_loss / len(train_loader)
     avg_dice = total_dice / len(train_loader)
     avg_iou = total_iou / len(train_loader)
