@@ -2,35 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def dice_loss(pred, target, smooth=1e-6):
-    """Dice loss for segmentation"""
-    pred = torch.softmax(pred, dim=1)
-    pred = pred[:, 1]  # Get foreground class
-    
-    target = target.float()
-    
-    intersection = (pred * target).sum()
-    dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
-    
-    return 1 - dice
-
-def dice_score(pred, target, smooth=1e-6):
-    """Dice score for evaluation"""
-    pred = torch.softmax(pred, dim=1)
-    pred = pred[:, 1]  # Get foreground class
-    
-    target = target.float()
-    
-    intersection = (pred * target).sum()
-    dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
-    
-    return dice
-
-def combined_loss(pred, target, alpha=0.5):
-    """Combined Dice + Cross-entropy loss"""
+def bce_loss(pred, target):
+    """Binary Cross Entropy loss for segmentation"""
     ce_loss = F.cross_entropy(pred, target.long())
-    dice_loss_val = dice_loss(pred, target)
-    return alpha * ce_loss + (1 - alpha) * dice_loss_val
+    return ce_loss
 
 def evidential_segmentation_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
     """
