@@ -6,9 +6,6 @@ import numpy as np
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-# -----------------------------
-# Dataset class
-# -----------------------------
 class ISIC2018SegmentationDataset(Dataset):
     def __init__(self, img_dir, mask_dir, transform=None):
         self.img_dir = img_dir
@@ -42,9 +39,6 @@ class ISIC2018SegmentationDataset(Dataset):
 
         return image, mask
 
-# -----------------------------
-# Albumentations transforms
-# -----------------------------
 def get_transforms(input_size=224):
     train_transform = A.Compose([
         A.Resize(height=input_size, width=input_size),
@@ -65,9 +59,6 @@ def get_transforms(input_size=224):
 
     return train_transform, val_transform
 
-# -----------------------------
-# DataLoader function
-# -----------------------------
 def get_isic2018_loaders(
         root="./segmentation/datasets/isic2018seg",
         batch_size=16,
