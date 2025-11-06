@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import torch
-from torchmetrics.classification import JaccardIndex, F1Score, Accuracy, CalibrationError
+from torchmetrics import JaccardIndex, F1Score, Accuracy, AUROC, AveragePrecision, CalibrationError
 
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
@@ -40,26 +40,35 @@ def evaluate(model, test_loader, device, args):
             all_probs.append(probs.cpu())
 
     # --- Concatenate all batches ---
-    all_labels = torch.cat(all_labels)
-    all_probs = torch.cat(all_probs)
-    preds = torch.argmax(all_probs, dim=1)
+    all_labels = torch.cat(all_labels)           # [B, H, W]
+    all_probs = torch.cat(all_probs)             # [B, C, H, W]
+
+    # --- Flatten for per-pixel metrics ---
+    B, C, H, W = all_probs.shape
+    all_probs_flat = all_probs.permute(0, 2, 3, 1).reshape(-1, C)  # [B*H*W, C]
+    all_labels_flat = all_labels.reshape(-1)                        # [B*H*W]
+    preds_flat = torch.argmax(all_probs_flat, dim=1)
 
     # --- Compute metrics ---
-    dice = F1Score(num_classes=args.num_classes, average='macro')(preds, all_labels).item()
-    iou = JaccardIndex(num_classes=args.num_classes)(preds, all_labels).item()
-    acc = Accuracy(num_classes=args.num_classes)(preds, all_labels).item()
-    ece = CalibrationError(n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs, all_labels).item()
-    mce = CalibrationError(n_bins=15, norm='max', num_classes=args.num_classes)(all_probs, all_labels).item()
+    dice = F1Score(num_classes=args.num_classes, average='macro')(preds_flat, all_labels_flat).item()
+    iou = JaccardIndex(num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
+    acc = Accuracy(num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
+    ece = CalibrationError(n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
+    mce = CalibrationError(n_bins=15, norm='max', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
+    auroc = AUROC(num_classes=args.num_classes, average='macro')(all_probs_flat, all_labels_flat).item()
+    aupr = AveragePrecision(num_classes=args.num_classes, average='macro')(all_probs_flat, all_labels_flat).item()
 
     # --- Store metrics ---
     metrics = {
         "dice": dice,
         "iou": iou,
         "pixel_accuracy": acc,
+        "auroc": auroc,
+        "aupr": aupr,
         "ece": ece,
         "mce": mce,
-        "nll": float(nll(all_probs, all_labels)),
-        "brier": float(brier(all_probs, all_labels)),
+        "nll": float(nll(all_probs_flat, all_labels_flat)),
+        "brier": float(brier(all_probs_flat, all_labels_flat)),
     }
 
     return metrics, all_probs, all_labels
