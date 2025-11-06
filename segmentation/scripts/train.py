@@ -3,12 +3,12 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import wandb
 
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_segmentation_loaders
-from segmentation.utils.segmentation_loss import combined_loss, evidential_segmentation_loss
+from segmentation.utils.segmentation_loss import bce_loss, evidential_segmentation_loss
 from segmentation.utils.segmentation_metrics import dice_score, iou_score, pixel_accuracy
 
 def train_epoch(model, train_loader, device, optimizer, epoch, args):
@@ -36,7 +36,7 @@ def train_epoch(model, train_loader, device, optimizer, epoch, args):
             logits = torch.log(probs + 1e-8)
         else:
             logits = model(images)
-            loss = combined_loss(logits, masks, alpha=0.5)
+            loss = bce_loss(logits, masks)
             probs = torch.softmax(logits, dim=1)
 
         loss.backward()
@@ -52,12 +52,7 @@ def train_epoch(model, train_loader, device, optimizer, epoch, args):
         total_iou += iou
         total_acc += acc
 
-        # Print occasional updates
-        if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(train_loader):
-            print(
-                f"Epoch [{epoch}] Batch [{batch_idx + 1}/{len(train_loader)}] "
-                f"Loss: {loss.item():.4f} | Dice: {dice:.4f} | IoU: {iou:.4f} | Acc: {acc:.4f}"
-            )
+        # No batch-level printing - only epoch-level
 
     avg_loss = total_loss / len(train_loader)
     avg_dice = total_dice / len(train_loader)
@@ -90,7 +85,7 @@ def validate_epoch(model, val_loader, device, epoch, args):
                 logits = torch.log(probs + 1e-8)
             else:
                 logits = model(images)
-                loss = combined_loss(logits, masks, alpha=0.5)
+                loss = bce_loss(logits, masks)
 
             # Compute metrics
             dice = dice_score(logits, masks)
@@ -102,12 +97,7 @@ def validate_epoch(model, val_loader, device, epoch, args):
             total_iou += iou
             total_acc += acc
 
-            # Print occasional updates
-            if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(val_loader):
-                print(
-                    f"Validation [{epoch}] Batch [{batch_idx + 1}/{len(val_loader)}] "
-                    f"Loss: {loss.item():.4f} | Dice: {dice:.4f} | IoU: {iou:.4f} | Acc: {acc:.4f}"
-                )
+            # No batch-level printing - only epoch-level
 
     avg_loss = total_loss / len(val_loader)
     avg_dice = total_dice / len(val_loader)
@@ -126,10 +116,8 @@ def train(model, train_loader, val_loader, device, args):
     # Optimizer and scheduler
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     
-    # Learning rate scheduler
-    warmup_scheduler = LinearLR(optimizer, start_factor=0.1, total_iters=args.warmup_epochs)
-    main_scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs - args.warmup_epochs)
-    scheduler = SequentialLR(optimizer, [warmup_scheduler, main_scheduler], milestones=[args.warmup_epochs])
+    # Learning rate scheduler - ReduceLROnPlateau
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10, verbose=True)
     
     best_dice = 0
     patience_counter = 0
@@ -146,7 +134,7 @@ def train(model, train_loader, val_loader, device, args):
         )
         
         # Learning rate scheduling
-        scheduler.step()
+        scheduler.step(val_dice)
         
         # Logging
         wandb.log({
@@ -192,7 +180,6 @@ def main():
     parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
     parser.add_argument('--num_workers', type=int, default=8, help='Dataloader workers')
     parser.add_argument('--lr', type=float, default=1e-4, help='Base learning rate')
-    parser.add_argument('--warmup_epochs', type=int, default=10, help='Warmup epochs')
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability')
     parser.add_argument('--early_stop_patience', type=int, default=20, help='Early stopping patience')
     parser.add_argument('--edl', action='store_true', help='Use Evidential Deep Learning loss')
