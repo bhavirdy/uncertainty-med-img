@@ -10,6 +10,10 @@ def dice_score(pred, target, smooth=1e-6):
     
     target = target.float()
     
+    # Flatten spatial dimensions
+    pred = pred.view(-1)
+    target = target.view(-1)
+    
     intersection = (pred * target).sum()
     dice = (2. * intersection + smooth) / (pred.sum() + target.sum() + smooth)
     
@@ -21,6 +25,10 @@ def iou_score(pred, target, smooth=1e-6):
     pred = pred[:, 1]  # Get foreground class
     
     target = target.float()
+    
+    # Flatten spatial dimensions
+    pred = pred.view(-1)
+    target = target.view(-1)
     
     intersection = (pred * target).sum()
     union = pred.sum() + target.sum() - intersection
@@ -37,16 +45,19 @@ def pixel_accuracy(pred, target):
 def segmentation_ece(probs, labels, n_bins=15):
     """Expected Calibration Error for segmentation"""
     # Flatten spatial dimensions
-    probs_flat = probs.view(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
-    labels_flat = labels.view(labels.size(0), -1)  # [B, H*W]
+    probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
+    labels_flat = labels.reshape(labels.size(0), -1)  # [B, H*W]
     
     # Get foreground class probabilities
-    fg_probs = probs_flat[:, 1]  # [B, H*W]
+    if probs.shape[1] == 1:
+        fg_probs = probs_flat[:, 0]
+    else:
+        fg_probs = probs_flat[:, 1]
     fg_labels = labels_flat.float()  # [B, H*W]
     
     # Flatten to 1D
-    fg_probs_flat = fg_probs.view(-1)  # [B*H*W]
-    fg_labels_flat = fg_labels.view(-1)  # [B*H*W]
+    fg_probs_flat = fg_probs.reshape(-1)  # [B*H*W]
+    fg_labels_flat = fg_labels.reshape(-1)  # [B*H*W]
     
     confidences, predictions = torch.max(torch.stack([1-fg_probs_flat, fg_probs_flat], dim=1), dim=1)
     accuracies = predictions.eq(fg_labels_flat.long())
@@ -64,16 +75,19 @@ def segmentation_ece(probs, labels, n_bins=15):
 def segmentation_mce(probs, labels, n_bins=15):
     """Maximum Calibration Error for segmentation"""
     # Flatten spatial dimensions
-    probs_flat = probs.view(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
-    labels_flat = labels.view(labels.size(0), -1)  # [B, H*W]
+    probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
+    labels_flat = labels.reshape(labels.size(0), -1)  # [B, H*W]
     
     # Get foreground class probabilities
-    fg_probs = probs_flat[:, 1]  # [B, H*W]
+    if probs.shape[1] == 1:
+        fg_probs = probs_flat[:, 0]
+    else:
+        fg_probs = probs_flat[:, 1]
     fg_labels = labels_flat.float()  # [B, H*W]
     
     # Flatten to 1D
-    fg_probs_flat = fg_probs.view(-1)  # [B*H*W]
-    fg_labels_flat = fg_labels.view(-1)  # [B*H*W]
+    fg_probs_flat = fg_probs.reshape(-1)  # [B*H*W]
+    fg_labels_flat = fg_labels.reshape(-1)  # [B*H*W]
     
     confidences, predictions = torch.max(torch.stack([1-fg_probs_flat, fg_probs_flat], dim=1), dim=1)
     accuracies = predictions.eq(fg_labels_flat.long())
@@ -90,12 +104,12 @@ def segmentation_mce(probs, labels, n_bins=15):
 
 def segmentation_nll(probs, labels):
     """Negative log-likelihood for segmentation"""
-    probs_flat = probs.view(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
-    labels_flat = labels.view(labels.size(0), -1)  # [B, H*W]
+    probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
+    labels_flat = labels.reshape(labels.size(0), -1)  # [B, H*W]
     
     # Flatten to 1D
-    probs_flat = probs_flat.permute(0, 2, 1).contiguous().view(-1, probs.size(1))  # [B*H*W, C]
-    labels_flat = labels_flat.view(-1)  # [B*H*W]
+    probs_flat = probs_flat.permute(0, 2, 1).contiguous().reshape(-1, probs.size(1))  # [B*H*W, C]
+    labels_flat = labels_flat.reshape(-1)  # [B*H*W]
     
     probs_np = probs_flat.cpu().numpy()
     labels_np = labels_flat.cpu().numpy()
@@ -104,12 +118,12 @@ def segmentation_nll(probs, labels):
 
 def segmentation_brier(probs, labels):
     """Brier score for segmentation"""
-    probs_flat = probs.view(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
-    labels_flat = labels.view(labels.size(0), -1)  # [B, H*W]
+    probs_flat = probs.reshape(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
+    labels_flat = labels.reshape(labels.size(0), -1)  # [B, H*W]
     
     # Flatten to 1D
-    probs_flat = probs_flat.permute(0, 2, 1).contiguous().view(-1, probs.size(1))  # [B*H*W, C]
-    labels_flat = labels_flat.view(-1)  # [B*H*W]
+    probs_flat = probs_flat.permute(0, 2, 1).contiguous().reshape(-1, probs.size(1))  # [B*H*W, C]
+    labels_flat = labels_flat.reshape(-1)  # [B*H*W]
     
     probs_np = probs_flat.cpu().numpy()
     labels_np = labels_flat.cpu().numpy()
