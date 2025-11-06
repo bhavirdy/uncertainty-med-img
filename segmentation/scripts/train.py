@@ -7,7 +7,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import wandb
 
 from segmentation.models.unet import UNet, UNetEDL
-from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_segmentation_loaders
+from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
 from segmentation.utils.segmentation_loss import bce_loss, evidential_segmentation_loss
 from segmentation.utils.segmentation_metrics import dice_score, iou_score, pixel_accuracy
 
@@ -192,7 +192,7 @@ def main():
 
     # --- Data loaders ---
     if args.dataset.lower() == "isic2018":
-        train_loader, val_loader, _, num_classes = get_isic2018_segmentation_loaders(
+        train_loader, val_loader, _, num_classes = get_isic2018_loaders(
             batch_size=args.batch_size, num_workers=args.num_workers
         )
     else:
