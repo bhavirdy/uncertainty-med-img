@@ -4,3 +4,5 @@ numpy
 pillow
 matplotlib
 wandb
+segmentation-models-pytorch
+efficientnet-pytorch
