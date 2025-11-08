@@ -1,7 +1,7 @@
 import torch.nn as nn
 import segmentation_models_pytorch as smp
 
-class UNetMC(nn.Module):
+class UNet(nn.Module):
     def __init__(self, n_channels=3, n_classes=2, encoder_name='resnet34', encoder_weights='imagenet', dropout_p=0.5):
         super().__init__()
         self.model = smp.Unet(

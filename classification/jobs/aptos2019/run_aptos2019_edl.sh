@@ -2,7 +2,7 @@
 #SBATCH --job-name=aptos2019_edl
 #SBATCH --output=logs/aptos2019_edl_%j.out
 #SBATCH --error=logs/aptos2019_edl_%j.err
-#SBATCH --partition=stampede
+#SBATCH --partition=bigbatch
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -19,6 +19,7 @@ mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
 python -m classification.scripts.train \
     --dataset aptos2019 \
+    --num_classes 5 \
     --epochs 30 \
     --batch_size 32 \
     --num_workers 8 \
@@ -28,7 +29,9 @@ python -m classification.scripts.train \
     --dropout 0.5 \
     --early_stop_patience 10 \
     --output_dir "$TRAIN_DIR" \
-    --edl
+    --edl \
+    --annealing_epochs 10 \
+    --lambda_reg 0.001
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 

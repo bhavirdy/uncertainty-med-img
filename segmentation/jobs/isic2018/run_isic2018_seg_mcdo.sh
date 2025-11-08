@@ -2,7 +2,7 @@
 #SBATCH --job-name=isic2018_seg_mcdo
 #SBATCH --output=logs/isic2018_seg_mcdo_%j.out
 #SBATCH --error=logs/isic2018_seg_mcdo_%j.err
-#SBATCH --partition=stampede
+#SBATCH --partition=bigbatch
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -19,6 +19,7 @@ mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
 python -m segmentation.scripts.train \
     --dataset isic2018 \
+    --num_classes 2 \
     --epochs 100 \
     --batch_size 16 \
     --num_workers 8 \
@@ -26,7 +27,6 @@ python -m segmentation.scripts.train \
     --dropout 0.5 \
     --early_stop_patience 20 \
     --output_dir "$TRAIN_DIR" \
-    --timestamp "$TIMESTAMP"
 
 MODEL_PATH="$TRAIN_DIR/best_model.pth"
 

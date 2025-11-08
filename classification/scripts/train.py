@@ -1,21 +1,25 @@
 import argparse
 import os
+import csv
 import torch
+import wandb
 import torch.nn as nn
 import torch.optim as optim
-import csv
-import wandb
+from torchmetrics import Accuracy
 from torchvision.models import ResNet50_Weights
 
-from classification.models.resnet import ResNet50
-from classification.models.resnet_edl import ResNet50EDL
+from classification.models.resnet import ResNet50, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
-from classification.utils.metrics import accuracy
 from classification.utils.edl_loss import evidential_loss
 
 def train(model, train_loader, val_loader, device, args):
-    """Train the model using specified arguments."""
+    # --- Initialize wandb ---
+    wandb.init(
+        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
+        config=vars(args)
+    )
+
     model = model.to(device)
 
     base_lr = args.lr
@@ -24,9 +28,11 @@ def train(model, train_loader, val_loader, device, args):
     optimizer = optim.AdamW(model.model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
+    train_acc_metric = Accuracy(task="multiclass", num_classes=args.num_classes).to(device)
+    val_acc_metric = Accuracy(task="multiclass", num_classes=args.num_classes).to(device)
+
     best_val_loss = float('inf')
     early_stop_counter = 0
-    best_model_state = None
 
     os.makedirs(args.output_dir, exist_ok=True)
     log_csv_path = os.path.join(args.output_dir, "train_log.csv")
@@ -35,7 +41,7 @@ def train(model, train_loader, val_loader, device, args):
         writer.writerow(['epoch', 'train_loss', 'train_acc', 'val_loss', 'val_acc'])
 
     for epoch in range(args.epochs):
-        # --- Warmup phase ---
+        # --- Post-warmup: unfreeze backbone ---
         if epoch == args.warmup_epochs:
             for param in model.parameters():
                 param.requires_grad = True
@@ -43,103 +49,103 @@ def train(model, train_loader, val_loader, device, args):
 
         # --- Training ---
         model.train()
-        running_loss, running_acc = 0.0, 0.0
+        train_loss = 0.0
+        train_acc_metric.reset()
 
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
+
             optimizer.zero_grad()
 
             outputs = model(imgs)
 
-            # Compute loss
             if args.edl:
                 loss = evidential_loss(
                     alpha=outputs,
                     target=labels,
-                    num_classes=outputs.shape[1],
+                    num_classes=args.num_classes,
                     epoch=epoch,
-                    annealing_epochs=10,
-                    lambda_reg=0.001
+                    annealing_epochs=args.annealing_epochs,
+                    lambda_reg=args.lambda_reg
                 )
-                probs = outputs / torch.sum(outputs, dim=1, keepdim=True)
             else:
                 loss = nn.CrossEntropyLoss()(outputs, labels)
-                probs = torch.softmax(outputs, dim=1)
 
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item() * imgs.size(0)
-            running_acc += accuracy(probs, labels) * imgs.size(0)
+            preds = torch.argmax(outputs, dim=1)
 
-        epoch_loss = running_loss / len(train_loader.dataset)
-        epoch_acc = running_acc / len(train_loader.dataset)
+            train_acc_metric.update(preds, labels)
+            train_loss += loss.item() * imgs.size(0)
+
+        avg_train_acc = train_acc_metric.compute().item()
+        avg_train_loss = train_loss / len(train_loader)
 
         # --- Validation ---
         model.eval()
-        val_loss, val_acc = 0.0, 0.0
+        val_loss = 0.0
+        val_acc_metric.reset()
 
         with torch.no_grad():
             for imgs, labels in val_loader:
                 imgs, labels = imgs.to(device), labels.to(device)
+                
                 outputs = model(imgs)
 
                 if args.edl:
                     loss = evidential_loss(
                         alpha=outputs,
                         target=labels,
-                        num_classes=outputs.shape[1],
+                        num_classes=args.num_classes,
                         epoch=epoch,
-                        annealing_epochs=10,
-                        lambda_reg=0.001
+                        annealing_epochs=args.annealing_epochs,
+                        lambda_reg=args.lambda_reg
                     )
-                    probs = outputs / torch.sum(outputs, dim=1, keepdim=True)
                 else:
                     loss = nn.CrossEntropyLoss()(outputs, labels)
-                    probs = torch.softmax(outputs, dim=1)
 
+                preds = torch.argmax(outputs, dim=1)
+
+                val_acc_metric.update(preds, labels)
                 val_loss += loss.item() * imgs.size(0)
-                val_acc += accuracy(probs, labels) * imgs.size(0)
 
-        val_loss /= len(val_loader.dataset)
-        val_acc /= len(val_loader.dataset)
+        avg_val_acc = val_acc_metric.compute().item()
+        avg_val_loss = val_loss / len(val_loader)
 
-        print(f"Epoch {epoch+1}/{args.epochs} "
-              f"Train: loss={epoch_loss:.4f} acc={epoch_acc:.4f} | "
-              f"Val: loss={val_loss:.4f} acc={val_acc:.4f}")
+        scheduler.step(avg_val_loss)
 
-        # CSV + WandB logging
+        print(f"Epoch: {epoch+1}/{args.epochs}, "
+              f"Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_acc:.4f}, "
+              f"Val Loss: {avg_val_loss:.4f}, Val Acc: {avg_val_acc:.4f}")
+
+        # --- Logging ---
         with open(log_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([epoch + 1, epoch_loss, epoch_acc, val_loss, val_acc])
+            writer.writerow([epoch + 1, avg_train_loss, avg_train_acc, avg_val_loss, avg_val_acc])
 
         wandb.log({
             "epoch": epoch + 1,
-            "train_loss": epoch_loss,
-            "train_acc": epoch_acc,
-            "val_loss": val_loss,
-            "val_acc": val_acc
+            "train_loss": avg_train_loss,
+            "train_acc": avg_train_acc,
+            "val_loss": avg_val_loss,
+            "val_acc": avg_val_acc
         })
 
-        scheduler.step(val_loss)
-
         # --- Early Stopping ---
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            best_model_state = model.state_dict()
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
             early_stop_counter = 0
+            save_model(model.state_dict(), args.output_dir, filename="model.pth")
         else:
             early_stop_counter += 1
             if early_stop_counter >= args.early_stop_patience:
                 print(f"Early stopping at epoch {epoch + 1}")
                 break
-
-    # Save best model
-    if best_model_state:
-        save_model(best_model_state, args.output_dir, filename="model.pth")
+    
+    wandb.finish()
 
 def save_model(model_state, output_dir, filename):
-    """Save model state dict to specified directory."""
     os.makedirs(output_dir, exist_ok=True)
     model_path = os.path.join(output_dir, filename)
     torch.save(model_state, model_path)
@@ -150,6 +156,7 @@ def main():
 
     # --- Arguments ---
     parser.add_argument('--dataset', type=str, required=True, choices=['aptos2019', 'isic2018'], help='Dataset name')
+    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in dataset')
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save logs and model')
     parser.add_argument('--epochs', type=int, default=30, help='Number of epochs')
     parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
@@ -160,6 +167,8 @@ def main():
     parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability')
     parser.add_argument('--early_stop_patience', type=int, default=7, help='Early stopping patience')
     parser.add_argument('--edl', action='store_true', help='Use Evidential Deep Learning loss')
+    parser.add_argument('--annealing_epochs', type=int, default=10, help='EDL annealing epochs')
+    parser.add_argument('--lambda_reg', type=float, default=0.001, help='EDL lambda regularisation term')
 
     args = parser.parse_args()
 
@@ -169,31 +178,17 @@ def main():
 
     # --- Data loaders ---
     if args.dataset.lower() == "aptos2019":
-        train_loader, val_loader, _, num_classes = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+        train_loader, val_loader, _ = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     elif args.dataset.lower() == "isic2018":
-        train_loader, val_loader, _, num_classes = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+        train_loader, val_loader, _ = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     else:
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Model ---
     if args.edl:
-        model = ResNet50EDL(
-            num_classes=num_classes,
-            weights=ResNet50_Weights.DEFAULT,
-            dropout_p=args.dropout
-        )
+        model = ResNet50EDL(num_classes=args.num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=args.dropout)
     else:
-        model = ResNet50(
-            num_classes=num_classes,
-            weights=ResNet50_Weights.DEFAULT,
-            dropout_p=args.dropout
-        )
-
-    # --- WandB init ---
-    wandb.init(
-        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
-        config=vars(args)
-    )
+        model = ResNet50(num_classes=args.num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=args.dropout)
 
     # --- Train ---
     train(model, train_loader, val_loader, device, args)

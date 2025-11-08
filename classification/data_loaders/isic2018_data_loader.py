@@ -77,6 +77,4 @@ def get_isic2018_loaders(
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    num_classes = len(train_set.label_cols)
-
-    return train_loader, val_loader, test_loader, num_classes
+    return train_loader, val_loader, test_loader

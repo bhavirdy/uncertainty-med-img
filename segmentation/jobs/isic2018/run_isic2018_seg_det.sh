@@ -19,15 +19,15 @@ mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 
 python -m segmentation.scripts.train \
     --dataset isic2018 \
+    --num_classes 2 \
     --epochs 100 \
     --batch_size 16 \
     --num_workers 8 \
     --lr 1e-4 \
     --dropout 0.5 \
     --early_stop_patience 20 \
-    --output_dir "$TRAIN_DIR" \
-    --timestamp "$TIMESTAMP"
-
+    --output_dir "$TRAIN_DIR" 
+    
 MODEL_PATH="$TRAIN_DIR/best_model.pth"
 
 python -m segmentation.scripts.evaluate \
