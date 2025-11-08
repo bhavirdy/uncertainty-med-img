@@ -4,6 +4,8 @@ import torch.nn.functional as F
 def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
     S = torch.sum(alpha, dim=1, keepdim=True)
     probs = alpha / S
+    
+    # Convert target to one-hot
     target_onehot = F.one_hot(target, num_classes=num_classes).float()
 
     # Data (MSE) term
@@ -29,4 +31,5 @@ def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lamb
     annealing_coef = min(1.0, epoch / annealing_epochs)
 
     loss = loss_data + lambda_reg * annealing_coef * kl_div
+    
     return torch.mean(loss)

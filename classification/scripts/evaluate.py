@@ -9,7 +9,7 @@ from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import brier, nll
 from classification.utils.uncertainty import mcdo_predictions, predictive_mean
-from classification.utils.visualisations import reliability_diagram_from_probs, predictive_entropy_histogram_from_probs
+from classification.utils.visualisations import reliability_diagram, predictive_entropy_histogram
 
 def evaluate(model, test_loader, device, args):
     model = model.to(device)
@@ -78,8 +78,8 @@ def save_metrics(metrics, output_dir, method):
 
 def generate_plots(all_probs, all_labels, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
-    reliability_diagram_from_probs(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability.png"))
-    predictive_entropy_histogram_from_probs(all_probs, output_path=os.path.join(output_dir, f"{method}_entropy_hist.png"))
+    reliability_diagram(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability.png"))
+    predictive_entropy_histogram(all_probs, output_path=os.path.join(output_dir, f"{method}_entropy_hist.png"))
 
 def main():
     parser = argparse.ArgumentParser()

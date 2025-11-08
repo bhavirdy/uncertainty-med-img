@@ -16,13 +16,3 @@ def mcdo_predictions(model, inputs, n_samples=20):
 def predictive_mean(pred_samples):
     """Mean predictive distribution"""
     return pred_samples.mean(dim=0)
-
-def predictive_variance(pred_samples):
-    """Compute predictive variance"""
-    return pred_samples.var(dim=0)
-
-def predictive_entropy(pred_samples):
-    """Compute predictive entropy"""
-    mean_pred = pred_samples.mean(dim=0)
-    entropy = -torch.sum(mean_pred * torch.log(mean_pred + 1e-8), dim=1)
-    return entropy

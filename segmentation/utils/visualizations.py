@@ -4,10 +4,7 @@ import torch
 import seaborn as sns
 from sklearn.calibration import calibration_curve
 
-def reliability_diagram_from_probs(probs, labels, output_path, n_bins=15):
-    """
-    Generate reliability diagram for segmentation
-    """
+def reliability_diagram(probs, labels, output_path, bins=15):
     # Flatten spatial dimensions
     probs_flat = probs.view(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
     labels_flat = labels.view(labels.size(0), -1)  # [B, H*W]
@@ -22,7 +19,7 @@ def reliability_diagram_from_probs(probs, labels, output_path, n_bins=15):
     
     # Compute calibration curve
     fraction_of_positives, mean_predicted_value = calibration_curve(
-        fg_labels_flat, fg_probs_flat, n_bins=n_bins
+        fg_labels_flat, fg_probs_flat, n_bins=bins
     )
     
     # Plot
@@ -38,10 +35,7 @@ def reliability_diagram_from_probs(probs, labels, output_path, n_bins=15):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def predictive_entropy_histogram_from_probs(probs, labels, output_path):
-    """
-    Generate predictive entropy histogram for segmentation
-    """
+def predictive_entropy_histogram(probs, output_path, bins=30):
     # Flatten spatial dimensions
     probs_flat = probs.view(probs.size(0), probs.size(1), -1)  # [B, C, H*W]
     
@@ -51,10 +45,10 @@ def predictive_entropy_histogram_from_probs(probs, labels, output_path):
     
     # Plot histogram
     plt.figure(figsize=(10, 6))
-    plt.hist(entropy_flat, bins=50, alpha=0.7, edgecolor='black')
+    plt.hist(entropy_flat, bins=bins, alpha=0.7, edgecolor='black')
     plt.xlabel('Predictive Entropy')
     plt.ylabel('Frequency')
-    plt.title('Predictive Entropy Distribution')
+    plt.title('Predictive Entropy Histogram')
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight')

@@ -20,15 +20,13 @@ mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 python -m segmentation.scripts.train \
     --dataset isic2018 \
     --num_classes 2 \
+    --output_dir "$TRAIN_DIR" \
     --epochs 100 \
-    --batch_size 16 \
+    --batch_size 32 \
     --num_workers 8 \
     --lr 1e-4 \
-    --dropout 0.5 \
     --early_stop_patience 20 \
-    --annealing_epochs 10 \
-    --output_dir "$TRAIN_DIR" \
-    --edl \
+    --method edl \
     --annealing_epochs 10 \
     --lambda_reg 0.001
 
@@ -37,9 +35,8 @@ MODEL_PATH="$TRAIN_DIR/best_model.pth"
 python -m segmentation.scripts.evaluate \
     --dataset isic2018 \
     --num_classes 2 \
-    --method edl \
     --model_path "$MODEL_PATH" \
-    --batch_size 16 \
+    --output_dir "$EVAL_DIR" \
+    --batch_size 32 \
     --num_workers 8 \
-    --dropout 0.5 \
-    --output_dir "$EVAL_DIR"
+    --method edl

@@ -1,10 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
-    """
-    Evidential loss adapted for segmentation
-    """
+def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.001):
     S = torch.sum(alpha, dim=1, keepdim=True)
     probs = alpha / S
     
@@ -35,4 +32,5 @@ def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lamb
     annealing_coef = min(1.0, epoch / annealing_epochs)
     
     loss = loss_data + lambda_reg * annealing_coef * kl_div
+    
     return torch.mean(loss)

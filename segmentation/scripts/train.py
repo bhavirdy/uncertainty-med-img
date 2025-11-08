@@ -9,7 +9,7 @@ from torchmetrics.classification import JaccardIndex, F1Score, Accuracy
 
 from segmentation.models.unet import UNetDeterministic, UNetMCDO, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
-from segmentation.utils.evidential_loss import evidential_loss
+from segmentation.utils.edl_loss import evidential_loss
 
 def train(model, train_loader, val_loader, device, args):
     # --- Initialize wandb ---

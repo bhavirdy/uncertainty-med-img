@@ -45,7 +45,7 @@ class UNetEDL(nn.Module):
         self.evidence_head = nn.Softplus()
 
     def forward(self, x):
-        logits = self.backbone(x)
-        evidence = self.evidence_head(logits)
+        outputs = self.backbone(x)
+        evidence = self.evidence_head(outputs)
         alpha = evidence + 1  # Dirichlet concentration parameters
         return alpha
