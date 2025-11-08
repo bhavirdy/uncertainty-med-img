@@ -20,24 +20,23 @@ mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
 python -m classification.scripts.train \
     --dataset isic2018 \
     --num_classes 7 \
+    --output_dir "$TRAIN_DIR" \
     --epochs 30 \
     --batch_size 32 \
     --num_workers 8 \
     --lr 1e-4 \
     --warmup_lr 1e-3 \
     --warmup_epochs 5 \
-    --dropout 0.5 \
     --early_stop_patience 10 \
-    --output_dir "$TRAIN_DIR"
+    --method deterministic
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
 python -m classification.scripts.evaluate \
     --dataset isic2018 \
     --num_classes 7 \
-    --method deterministic \
     --model_path "$MODEL_PATH" \
+    --output_dir "$EVAL_DIR" \
     --batch_size 32 \
     --num_workers 8 \
-    --dropout 0.5 \
-    --output_dir "$EVAL_DIR"
+    --method deterministic 

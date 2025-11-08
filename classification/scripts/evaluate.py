@@ -4,7 +4,7 @@ import os
 import torch
 from torchmetrics import Accuracy, Precision, Recall, F1Score, AUROC, AveragePrecision, CalibrationError
 
-from classification.models.resnet import ResNet50, ResNet50EDL
+from classification.models.resnet import ResNet50, ResNet50_MCDO, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import brier, nll
@@ -82,17 +82,20 @@ def generate_plots(all_probs, all_labels, output_dir, method):
     predictive_entropy_histogram_from_probs(all_probs, output_path=os.path.join(output_dir, f"{method}_entropy_hist.png"))
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate a trained model with uncertainty metrics")
+    parser = argparse.ArgumentParser()
 
     parser.add_argument("--dataset", type=str, required=True, choices=["aptos2019", "isic2018"])
-    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in the dataset')
+    parser.add_argument('--num_classes', type=int, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
-    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
+    
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=8)
-    parser.add_argument("--dropout", type=float, default=0.5)
+
+    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
+    parser.add_argument("--dropout", type=float, default=0.3)
     parser.add_argument("--mc_samples", type=int, default=20)
+
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -103,11 +106,13 @@ def main():
     elif args.dataset.lower() == "isic2018":
         _, _, test_loader = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
 
-    # --- Load model ---
-    if args.method == "edl":
+    # --- Model ---
+    if args.method == "deterministic":
+        model = ResNet50(num_classes=args.num_classes)
+    elif args.method == "mcdo":
+        model = ResNet50_MCDO(num_classes=args.num_classes)
+    elif args.method == "edl":
         model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
-    else:
-        model = ResNet50(num_classes=args.num_classes, dropout_p=args.dropout)
 
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)

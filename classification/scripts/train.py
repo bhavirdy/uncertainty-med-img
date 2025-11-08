@@ -6,9 +6,8 @@ import wandb
 import torch.nn as nn
 import torch.optim as optim
 from torchmetrics import Accuracy
-from torchvision.models import ResNet50_Weights
 
-from classification.models.resnet import ResNet50, ResNet50EDL
+from classification.models.resnet import ResNet50, ResNet50_MCDO, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.edl_loss import evidential_loss
@@ -16,7 +15,7 @@ from classification.utils.edl_loss import evidential_loss
 def train(model, train_loader, val_loader, device, args):
     # --- Initialize wandb ---
     wandb.init(
-        project=f"resnet50-{args.dataset.lower()}{'-edl' if args.edl else ''}",
+        project=f"resnet50-{args.dataset.lower()}-{args.method}",
         config=vars(args)
     )
 
@@ -59,7 +58,7 @@ def train(model, train_loader, val_loader, device, args):
 
             outputs = model(imgs)
 
-            if args.edl:
+            if args.method == 'edl':
                 loss = evidential_loss(
                     alpha=outputs,
                     target=labels,
@@ -93,7 +92,7 @@ def train(model, train_loader, val_loader, device, args):
                 
                 outputs = model(imgs)
 
-                if args.edl:
+                if args.method == 'edl':
                     loss = evidential_loss(
                         alpha=outputs,
                         target=labels,
@@ -152,24 +151,26 @@ def save_model(model_state, output_dir, filename):
     print(f"Saved model to {model_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Train ResNet50 for classification")
+    parser = argparse.ArgumentParser()
 
     # --- Arguments ---
-    parser.add_argument('--dataset', type=str, required=True, choices=['aptos2019', 'isic2018'], help='Dataset name')
-    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in dataset')
-    parser.add_argument('--output_dir', type=str, required=True, help='Directory to save logs and model')
-    parser.add_argument('--epochs', type=int, default=30, help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
-    parser.add_argument('--num_workers', type=int, default=8, help='Dataloader workers')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Base learning rate')
-    parser.add_argument('--warmup_lr', type=float, default=1e-3, help='Warmup learning rate')
-    parser.add_argument('--warmup_epochs', type=int, default=5, help='Warmup epochs')
-    parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability')
-    parser.add_argument('--early_stop_patience', type=int, default=7, help='Early stopping patience')
-    parser.add_argument('--edl', action='store_true', help='Use Evidential Deep Learning loss')
-    parser.add_argument('--annealing_epochs', type=int, default=10, help='EDL annealing epochs')
-    parser.add_argument('--lambda_reg', type=float, default=0.001, help='EDL lambda regularisation term')
-
+    parser.add_argument('--dataset', type=str, required=True, choices=['aptos2019', 'isic2018'])
+    parser.add_argument('--num_classes', type=int, required=True)
+    parser.add_argument('--output_dir', type=str, required=True)
+    
+    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--num_workers', type=int, default=8)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--warmup_lr', type=float, default=1e-3)
+    parser.add_argument('--warmup_epochs', type=int, default=5)
+    parser.add_argument('--early_stop_patience', type=int, default=10)
+    
+    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
+    parser.add_argument('--dropout', type=float, default=0.3)
+    parser.add_argument('--annealing_epochs', type=int, default=10)
+    parser.add_argument('--lambda_reg', type=float, default=0.001)
+    
     args = parser.parse_args()
 
     # --- Device setup ---
@@ -178,18 +179,18 @@ def main():
 
     # --- Data loaders ---
     if args.dataset.lower() == "aptos2019":
-        train_loader, val_loader, _ = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+        train_loader, val_loader = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     elif args.dataset.lower() == "isic2018":
-        train_loader, val_loader, _ = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
-    else:
-        raise ValueError(f"Dataset {args.dataset} not supported.")
+        train_loader, val_loader = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
 
     # --- Model ---
-    if args.edl:
-        model = ResNet50EDL(num_classes=args.num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=args.dropout)
-    else:
-        model = ResNet50(num_classes=args.num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=args.dropout)
-
+    if args.method == "deterministic":
+        model = ResNet50(num_classes=args.num_classes)
+    elif args.method == "mcdo":
+        model = ResNet50_MCDO(num_classes=args.num_classes)
+    elif args.method == "edl":
+        model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
+        
     # --- Train ---
     train(model, train_loader, val_loader, device, args)
 
