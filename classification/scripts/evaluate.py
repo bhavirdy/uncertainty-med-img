@@ -4,15 +4,12 @@ import os
 import torch
 from torchmetrics import Accuracy, Precision, Recall, F1Score, AUROC, AveragePrecision, CalibrationError
 
-from classification.models.resnet import ResNet50
-from classification.models.resnet_edl import ResNet50EDL
+from classification.models.resnet import ResNet50, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import brier, nll
 from classification.utils.uncertainty import mcdo_predictions, predictive_mean
-from classification.utils.visualisations import (
-    reliability_diagram_from_probs, predictive_entropy_histogram_from_probs
-)
+from classification.utils.visualisations import reliability_diagram_from_probs, predictive_entropy_histogram_from_probs
 
 def evaluate(model, test_loader, device, args):
     model = model.to(device)
@@ -24,15 +21,17 @@ def evaluate(model, test_loader, device, args):
         for imgs, labels in test_loader:
             imgs, labels = imgs.to(device), labels.to(device)
 
+            outputs = model(imgs)
+
             if args.method == "deterministic":
-                probs = torch.softmax(model(imgs), dim=1)
+                probs = torch.softmax(outputs, dim=1)
 
             elif args.method == "mcdo":
                 pred_samples = mcdo_predictions(model, imgs, n_samples=args.mc_samples)
                 probs = predictive_mean(pred_samples)
 
             elif args.method == "edl":
-                alpha = model(imgs)
+                alpha = outputs
                 probs = alpha / alpha.sum(dim=1, keepdim=True)
             
             # --- Collect all predictions and labels ---
@@ -79,15 +78,14 @@ def save_metrics(metrics, output_dir, method):
 
 def generate_plots(all_probs, all_labels, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
-    reliability_diagram_from_probs(all_probs, all_labels,
-                                   output_path=os.path.join(output_dir, f"{method}_reliability.png"))
-    predictive_entropy_histogram_from_probs(all_probs,
-                                            output_path=os.path.join(output_dir, f"{method}_entropy_hist.png"))
+    reliability_diagram_from_probs(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability.png"))
+    predictive_entropy_histogram_from_probs(all_probs, output_path=os.path.join(output_dir, f"{method}_entropy_hist.png"))
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a trained model with uncertainty metrics")
 
     parser.add_argument("--dataset", type=str, required=True, choices=["aptos2019", "isic2018"])
+    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in the dataset')
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
     parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
@@ -101,17 +99,15 @@ def main():
 
     # --- Load dataset ---
     if args.dataset.lower() == "aptos2019":
-        _, _, test_loader, num_classes = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+        _, _, test_loader = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     elif args.dataset.lower() == "isic2018":
-        _, _, test_loader, num_classes = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
-    else:
-        raise ValueError(f"Dataset {args.dataset} not supported.")
+        _, _, test_loader = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
 
     # --- Load model ---
     if args.method == "edl":
-        model = ResNet50EDL(num_classes=num_classes, dropout_p=args.dropout)
+        model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
     else:
-        model = ResNet50(num_classes=num_classes, dropout_p=args.dropout)
+        model = ResNet50(num_classes=args.num_classes, dropout_p=args.dropout)
 
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)

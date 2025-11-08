@@ -114,6 +114,4 @@ def get_aptos_loaders(train_csv="./classification/datasets/aptos2019/train_split
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    train_df = pd.read_csv(train_csv)
-
     return train_loader, val_loader, test_loader

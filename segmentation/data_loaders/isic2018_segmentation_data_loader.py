@@ -82,9 +82,7 @@ def get_isic2018_loaders(
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    num_classes = 2  # Background + lesion
-
-    return train_loader, val_loader, test_loader, num_classes
+    return train_loader, val_loader, test_loader
 
 def get_isic2018_loaders_test(
         root="./segmentation/datasets/isic2018seg",
@@ -101,6 +99,4 @@ def get_isic2018_loaders_test(
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-    num_classes = 2  # Background + lesion
-
-    return train_loader, num_classes
+    return train_loader

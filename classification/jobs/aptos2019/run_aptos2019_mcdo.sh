@@ -34,6 +34,7 @@ MODEL_PATH="$TRAIN_DIR/model.pth"
 
 python -m classification.scripts.evaluate \
     --dataset aptos2019 \
+    --num_classes 5 \
     --method mcdo \
     --model_path "$MODEL_PATH" \
     --batch_size 32 \

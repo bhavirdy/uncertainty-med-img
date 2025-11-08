@@ -7,11 +7,8 @@ from torchmetrics import JaccardIndex, F1Score, Accuracy, AUROC, AveragePrecisio
 from segmentation.models.unet import UNet, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
 from segmentation.utils.metrics import nll, brier
-from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean, predictive_variance
-from segmentation.utils.visualizations import (
-    reliability_diagram_from_probs, predictive_entropy_histogram_from_probs,
-    uncertainty_heatmap, aleatoric_epistemic_heatmap
-)
+from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean
+from segmentation.utils.visualizations import reliability_diagram_from_probs, predictive_entropy_histogram_from_probs, uncertainty_heatmap
 
 def evaluate(model, test_loader, device, args):
     model = model.to(device)
@@ -23,16 +20,17 @@ def evaluate(model, test_loader, device, args):
         for imgs, labels in test_loader:
             imgs, labels = imgs.to(device), labels.to(device)
 
+            outputs = model(imgs)
+
             if args.method == "deterministic":
-                logits = model(imgs)
-                probs = torch.softmax(logits, dim=1)
+                probs = torch.softmax(outputs, dim=1)
 
             elif args.method == "mcdo":
                 pred_samples = mcdo_predictions(model, imgs, n_samples=args.mc_samples)
                 probs = predictive_mean(pred_samples)
 
             elif args.method == "edl":
-                alpha = model(imgs)
+                alpha = outputs
                 probs = alpha / alpha.sum(dim=1, keepdim=True)
 
             # --- Collect all predictions and labels ---
@@ -52,7 +50,7 @@ def evaluate(model, test_loader, device, args):
     # --- Compute metrics ---
     dice = F1Score(num_classes=args.num_classes, average='macro')(preds_flat, all_labels_flat).item()
     iou = JaccardIndex(num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
-    acc = Accuracy(num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
+    acc = Accuracy(task='multiclass', num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
     ece = CalibrationError(n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
     mce = CalibrationError(n_bins=15, norm='max', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
     auroc = AUROC(num_classes=args.num_classes, average='macro')(all_probs_flat, all_labels_flat).item()
@@ -75,36 +73,22 @@ def evaluate(model, test_loader, device, args):
 
 def save_metrics(metrics, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
-    metrics_path = os.path.join(output_dir, f"{method}_metrics.json")
-    with open(metrics_path, 'w') as f:
-        json.dump(metrics, f, indent=2)
-    print(f"Saved metrics to {metrics_path}")
+    path = os.path.join(output_dir, f"metrics_{method}.json")
+    with open(path, "w") as f:
+        json.dump(metrics, f, indent=4)
+    print(f"Metrics for {method} saved to {path}")
 
-def generate_plots(all_probs, all_labels, output_dir, method, all_aleatoric=None, all_epistemic=None):
+def generate_plots(all_probs, all_labels, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
-    
-    # Reliability diagram
-    reliability_diagram_from_probs(all_probs, all_labels,
-                                  output_path=os.path.join(output_dir, f"{method}_reliability_diagram.png"))
-    
-    # Entropy histogram
-    predictive_entropy_histogram_from_probs(all_probs, all_labels,
-                                           output_path=os.path.join(output_dir, f"{method}_entropy_histogram.png"))
-    
-    # Uncertainty heatmap
-    uncertainty_heatmap(all_probs, all_labels,
-                       output_path=os.path.join(output_dir, f"{method}_uncertainty_heatmap.png"),
-                       method='entropy')
-    
-    # Aleatoric vs Epistemic uncertainty (if available)
-    if all_aleatoric is not None and all_epistemic is not None:
-        aleatoric_epistemic_heatmap(all_aleatoric, all_epistemic, all_labels,
-                                   output_path=os.path.join(output_dir, f"{method}_aleatoric_epistemic_heatmap.png"))
+    reliability_diagram_from_probs(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability_diagram.png"))
+    predictive_entropy_histogram_from_probs(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_entropy_histogram.png"))
+    uncertainty_heatmap(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_uncertainty_heatmap.png"), method='entropy')    
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate a trained segmentation model with uncertainty metrics")
 
     parser.add_argument("--dataset", type=str, required=True, choices=["isic2018"])
+    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in the dataset')
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
     parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
@@ -118,36 +102,21 @@ def main():
 
     # --- Load dataset ---
     if args.dataset.lower() == "isic2018":
-        _, _, test_loader, num_classes = get_isic2018_loaders(
-            batch_size=args.batch_size, num_workers=args.num_workers
-        )
-    else:
-        raise ValueError(f"Dataset {args.dataset} not supported.")
+        _, _, test_loader = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     
-    args.num_classes = num_classes
-
     # --- Load model ---
     if args.method == "edl":
-        model = UNetEDL(n_channels=3, n_classes=num_classes, dropout_p=args.dropout)
+        model = UNetEDL(n_channels=3, n_classes=args.num_classes, dropout_p=args.dropout)
     else:
-        model = UNet(n_channels=3, n_classes=num_classes, dropout_p=args.dropout)
+        model = UNet(n_channels=3, n_classes=args.num_classes, dropout_p=args.dropout)
 
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
 
     # --- Evaluate ---
-    metrics, all_probs, all_labels, all_aleatoric, all_epistemic = evaluate(
-        model, test_loader, device, method=args.method, mc_samples=args.mc_samples, args=args
-    )
-    
+    metrics, all_probs, all_labels = evaluate(model, test_loader, device, args)
     save_metrics(metrics, args.output_dir, args.method)
-    generate_plots(all_probs, all_labels, args.output_dir, args.method, all_aleatoric, all_epistemic)
-    
-    # Print metrics
-    print(f"\nEvaluation Results for {args.method}:")
-    print("=" * 50)
-    for key, value in metrics.items():
-        print(f"{key}: {value:.4f}")
+    generate_plots(all_probs, all_labels, args.output_dir, args.method)
 
 if __name__ == "__main__":
     main()

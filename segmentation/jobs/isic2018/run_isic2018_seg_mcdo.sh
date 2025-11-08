@@ -32,6 +32,7 @@ MODEL_PATH="$TRAIN_DIR/best_model.pth"
 
 python -m segmentation.scripts.evaluate \
     --dataset isic2018 \
+    --num_classes 2 \
     --method mcdo \
     --model_path "$MODEL_PATH" \
     --batch_size 16 \

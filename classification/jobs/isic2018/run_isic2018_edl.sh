@@ -37,6 +37,7 @@ MODEL_PATH="$TRAIN_DIR/model.pth"
 
 python -m classification.scripts.evaluate \
     --dataset isic2018 \
+    --num_classes 7 \
     --method edl \
     --model_path "$MODEL_PATH" \
     --batch_size 32 \
