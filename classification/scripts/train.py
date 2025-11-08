@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchmetrics import Accuracy
 
-from classification.models.resnet import ResNet50, ResNet50_MCDO, ResNet50EDL
+from classification.models.resnet import ResNet50Deterministic, ResNet50MCDO, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.edl_loss import evidential_loss
@@ -179,15 +179,15 @@ def main():
 
     # --- Data loaders ---
     if args.dataset.lower() == "aptos2019":
-        train_loader, val_loader = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+        train_loader, val_loader, _ = get_aptos_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     elif args.dataset.lower() == "isic2018":
-        train_loader, val_loader = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
+        train_loader, val_loader, _ = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
 
     # --- Model ---
     if args.method == "deterministic":
-        model = ResNet50(num_classes=args.num_classes)
+        model = ResNet50Deterministic(num_classes=args.num_classes)
     elif args.method == "mcdo":
-        model = ResNet50_MCDO(num_classes=args.num_classes)
+        model = ResNet50MCDO(num_classes=args.num_classes)
     elif args.method == "edl":
         model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
         

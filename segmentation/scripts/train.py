@@ -7,14 +7,14 @@ import torch.nn as nn
 import torch.optim as optim
 from torchmetrics.classification import JaccardIndex, F1Score, Accuracy
 
-from segmentation.models.unet import UNet, UNetEDL
+from segmentation.models.unet import UNetDeterministic, UNetMCDO, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
 from segmentation.utils.evidential_loss import evidential_loss
 
 def train(model, train_loader, val_loader, device, args):
     # --- Initialize wandb ---
     wandb.init(
-        project=f"unet-{args.dataset.lower()}{'-edl' if args.edl else ''}",    
+        project=f"unet-{args.dataset.lower()}-{args.method}",    
         config=vars(args)
     )
 
@@ -54,7 +54,7 @@ def train(model, train_loader, val_loader, device, args):
 
             outputs = model(imgs)
 
-            if args.edl:
+            if args.method == 'edl':
                 loss = evidential_loss(
                     alpha=outputs, 
                     target=labels,
@@ -94,7 +94,7 @@ def train(model, train_loader, val_loader, device, args):
 
                 outputs = model(imgs)
 
-                if args.edl:
+                if args.method == 'edl':
                     loss = evidential_loss(
                         alpha=outputs, 
                         target=labels, 
@@ -157,39 +157,40 @@ def save_model(model_state, output_dir, filename):
     print(f'Saved model to {model_path}')
 
 def main():
-    parser = argparse.ArgumentParser(description="Train U-Net for segmentation")
+    parser = argparse.ArgumentParser()
 
     # --- Arguments ---
-    parser.add_argument('--dataset', type=str, required=True, choices=['isic2018'], help='Dataset name')
-    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in dataset')
-    parser.add_argument('--output_dir', type=str, required=True, help='Directory to save logs and model')
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=16, help='Batch size')
-    parser.add_argument('--num_workers', type=int, default=8, help='Dataloader workers')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Base learning rate')
-    parser.add_argument('--dropout', type=float, default=0.5, help='Dropout probability')
-    parser.add_argument('--early_stop_patience', type=int, default=20, help='Early stopping patience')
-    parser.add_argument('--edl', action='store_true', help='Use Evidential Deep Learning loss')
-    parser.add_argument('--annealing_epochs', type=int, default=10, help='EDL annealing epochs')
-    parser.add_argument('--lambda_reg', type=float, default=0.001, help='EDL lambda regularisation term')
+    parser.add_argument('--dataset', type=str, required=True, choices=['isic2018'])
+    parser.add_argument('--num_classes', type=int, required=True)
+    parser.add_argument('--output_dir', type=str, required=True)
+
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--num_workers', type=int, default=8)
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--early_stop_patience', type=int, default=20)
+    
+    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
+    parser.add_argument('--dropout', type=float, default=0.3)
+    parser.add_argument('--annealing_epochs', type=int, default=10)
+    parser.add_argument('--lambda_reg', type=float, default=0.001)
 
     args = parser.parse_args()
 
     # --- Device setup ---
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f'Using device: {device}')
 
     # --- Data loaders ---
     if args.dataset.lower() == "isic2018":
         train_loader, val_loader, _ = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
-    else:
-        raise ValueError(f"Dataset {args.dataset} not supported.")
 
     # --- Model ---
-    if args.edl:
-        model = UNetEDL(n_channels=3, n_classes=args.num_classes, dropout_p=args.dropout)
-    else:
-        model = UNet(n_channels=3, n_classes=args.num_classes, dropout_p=args.dropout)
+    if args.method == "deterministic":
+        model = UNetDeterministic(n_classes=args.num_classes)
+    elif args.method == "mcdo":
+        model = UNetMCDO(n_classes=args.num_classes, dropout_p=args.dropout)
+    elif args.method == "edl":
+        model = UNetEDL(n_classes=args.num_classes)
 
     # --- Train ---
     train(model, train_loader, val_loader, device, args)

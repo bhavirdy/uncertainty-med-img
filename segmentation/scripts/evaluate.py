@@ -4,7 +4,7 @@ import os
 import torch
 from torchmetrics import JaccardIndex, F1Score, Accuracy, AUROC, AveragePrecision, CalibrationError
 
-from segmentation.models.unet import UNet, UNetEDL
+from segmentation.models.unet import UNetDeterministic, UNetMCDO, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
 from segmentation.utils.metrics import nll, brier
 from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean
@@ -85,30 +85,35 @@ def generate_plots(all_probs, all_labels, output_dir, method):
     uncertainty_heatmap(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_uncertainty_heatmap.png"), method='entropy')    
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate a trained segmentation model with uncertainty metrics")
+    parser = argparse.ArgumentParser()
 
     parser.add_argument("--dataset", type=str, required=True, choices=["isic2018"])
-    parser.add_argument('--num_classes', type=int, required=True, help='Number of classes in the dataset')
+    parser.add_argument('--num_classes', type=int, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--output_dir", type=str, required=True)
-    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
-    parser.add_argument("--batch_size", type=int, default=16)
+
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=8)
-    parser.add_argument("--dropout", type=float, default=0.5)
+    
+    parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
+    parser.add_argument("--dropout", type=float, default=0.3)
     parser.add_argument("--mc_samples", type=int, default=20)
     args = parser.parse_args()
 
+    # --- Device setup ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # --- Load dataset ---
     if args.dataset.lower() == "isic2018":
         _, _, test_loader = get_isic2018_loaders(batch_size=args.batch_size, num_workers=args.num_workers)
     
-    # --- Load model ---
-    if args.method == "edl":
-        model = UNetEDL(n_channels=3, n_classes=args.num_classes, dropout_p=args.dropout)
-    else:
-        model = UNet(n_channels=3, n_classes=args.num_classes, dropout_p=args.dropout)
+    # --- Model ---
+    if args.method == "deterministic":
+        model = UNetDeterministic(n_classes=args.num_classes)
+    elif args.method == "mcdo":
+        model = UNetMCDO(n_classes=args.num_classes, dropout_p=args.dropout)
+    elif args.method == "edl":
+        model = UNetEDL(n_classes=args.num_classes)
 
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)

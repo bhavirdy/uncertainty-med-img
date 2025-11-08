@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torchvision.models import resnet50, ResNet50_Weights
 
-class ResNet50(nn.Module):
+class ResNet50Deterministic(nn.Module):
     def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT):
         super().__init__()
         
@@ -22,7 +22,7 @@ class ResNet50(nn.Module):
     def forward(self, x):
         return self.model(x)
 
-class ResNet50_MCDO(nn.Module):
+class ResNet50MCDO(nn.Module):
     def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=0.3):
         super().__init__()
 

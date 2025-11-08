@@ -4,7 +4,7 @@ import os
 import torch
 from torchmetrics import Accuracy, Precision, Recall, F1Score, AUROC, AveragePrecision, CalibrationError
 
-from classification.models.resnet import ResNet50, ResNet50_MCDO, ResNet50EDL
+from classification.models.resnet import ResNet50Deterministic, ResNet50MCDO, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
 from classification.utils.metrics import brier, nll
@@ -108,9 +108,9 @@ def main():
 
     # --- Model ---
     if args.method == "deterministic":
-        model = ResNet50(num_classes=args.num_classes)
+        model = ResNet50Deterministic(num_classes=args.num_classes)
     elif args.method == "mcdo":
-        model = ResNet50_MCDO(num_classes=args.num_classes)
+        model = ResNet50MCDO(num_classes=args.num_classes)
     elif args.method == "edl":
         model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
 
