@@ -187,9 +187,9 @@ def main():
     if args.method == "deterministic":
         model = ResNet50Deterministic(num_classes=args.num_classes)
     elif args.method == "mcdo":
-        model = ResNet50MCDO(num_classes=args.num_classes)
+        model = ResNet50MCDO(num_classes=args.num_classes, dropout_p=args.dropout)
     elif args.method == "edl":
-        model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
+        model = ResNet50EDL(num_classes=args.num_classes)
         
     # --- Train ---
     train(model, train_loader, val_loader, device, args)
