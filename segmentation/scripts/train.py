@@ -61,7 +61,7 @@ def train(model, train_loader, val_loader, device, args):
                     lambda_reg=args.lambda_reg
                 )
             else:
-                loss = nn.CrossEntropyLoss(reduction='none')(outputs, labels.long())
+                loss = nn.CrossEntropyLoss()(outputs, labels.long())
 
             loss.backward()
             optimizer.step()
@@ -70,7 +70,7 @@ def train(model, train_loader, val_loader, device, args):
 
             train_dice_metric.update(preds, labels)
             train_iou_metric.update(preds, labels)
-            train_loss += loss.sum().item()
+            train_loss += loss.item() * imgs.size(0) * imgs.size(2) * imgs.size(3)
 
         avg_train_dice = train_dice_metric.compute().item()
         avg_train_iou = train_iou_metric.compute().item()
@@ -104,7 +104,7 @@ def train(model, train_loader, val_loader, device, args):
 
                 val_dice_metric.update(preds, labels)
                 val_iou_metric.update(preds, labels)
-                val_loss += loss.sum().item()
+                val_loss += loss.item() * imgs.size(0) * imgs.size(2) * imgs.size(3)
 
         avg_val_dice = val_dice_metric.compute().item()
         avg_val_iou = val_iou_metric.compute().item()
