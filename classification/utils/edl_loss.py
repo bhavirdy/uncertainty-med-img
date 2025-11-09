@@ -5,7 +5,7 @@ def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lamb
     S = alpha.sum(dim=1, keepdim=True)
     probs = alpha / S
 
-    # One-hot once
+    # One-hot
     target_onehot = F.one_hot(target, num_classes=num_classes).float()
 
     # MSE + variance
