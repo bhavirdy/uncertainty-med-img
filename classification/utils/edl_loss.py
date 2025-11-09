@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
+def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.001):
     S = torch.sum(alpha, dim=1, keepdim=True)
     probs = alpha / S
     
