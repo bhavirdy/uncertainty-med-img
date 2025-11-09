@@ -2,15 +2,15 @@ import matplotlib.pyplot as plt
 import torch
 from sklearn.calibration import calibration_curve
 
-def reliability_diagram(probs, labels, output_path, bins=15):
-    num_classes = probs.shape[1]
+def plot_reliability_diagram(all_probs, all_labels, output_path, bins=15):
+    num_classes = all_probs.shape[1]
     plt.figure(figsize=(8, 8))
     plt.plot([0,1], [0,1], '--', color='gray', label='Perfectly calibrated')
     
     for class_idx in range(num_classes):
         # One-vs-rest labels for the current class
-        labels_bin = (labels == class_idx).int().numpy()
-        prob_class = probs[:, class_idx].numpy()
+        labels_bin = (all_labels == class_idx).int().numpy()
+        prob_class = all_probs[:, class_idx].numpy()
         
         prob_true, prob_pred = calibration_curve(labels_bin, prob_class, n_bins=bins, strategy='uniform')
         
@@ -24,8 +24,8 @@ def reliability_diagram(probs, labels, output_path, bins=15):
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-def predictive_entropy_histogram(probs, output_path, bins=30):
-    entropy = -(probs * torch.log(probs + 1e-12)).sum(dim=1).cpu().numpy()
+def plot_entropy_histogram(all_probs, output_path, bins=30):
+    entropy = -(all_probs * torch.log(all_probs + 1e-12)).sum(dim=1).cpu().numpy()
     plt.figure(figsize=(10, 6))
     plt.hist(entropy, bins=bins, alpha=0.7, edgecolor='black')
     plt.xlabel('Predictive Entropy')

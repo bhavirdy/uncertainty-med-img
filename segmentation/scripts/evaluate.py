@@ -8,7 +8,7 @@ from sklearn.metrics import brier_score_loss, log_loss
 from segmentation.models.unet import UNetDeterministic, UNetMCDO, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
 from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean
-from segmentation.utils.visualisations import reliability_diagram, entropy_heatmap
+from segmentation.utils.visualisations import plot_reliability_diagram, plot_entropy_heatmaps
 
 def evaluate(model, test_loader, device, args):
     model = model.to(device)
@@ -77,8 +77,8 @@ def save_metrics(metrics, output_dir, method):
 
 def generate_plots(all_probs, all_labels, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
-    reliability_diagram(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability_diagram.png"))
-    entropy_heatmap(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_entropy_heatmap.png"))    
+    plot_reliability_diagram(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability_diagram.png"))
+    plot_entropy_heatmaps(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_entropy_heatmaps.png"))    
 
 def main():
     parser = argparse.ArgumentParser()
