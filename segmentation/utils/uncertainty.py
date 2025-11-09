@@ -1,6 +1,6 @@
 import torch
 
-def mcdo_predictions(model, inputs, n_samples=20):
+def mcdo_predictions(model, inputs, n_samples=30):
     model.train()  # enable dropout
     preds = []
     with torch.no_grad():
