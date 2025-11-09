@@ -113,9 +113,9 @@ def main():
     if args.method == "deterministic":
         model = ResNet50Deterministic(num_classes=args.num_classes)
     elif args.method == "mcdo":
-        model = ResNet50MCDO(num_classes=args.num_classes)
+        model = ResNet50MCDO(num_classes=args.num_classes, dropout_p=args.dropout)
     elif args.method == "edl":
-        model = ResNet50EDL(num_classes=args.num_classes, dropout_p=args.dropout)
+        model = ResNet50EDL(num_classes=args.num_classes)
 
     state_dict = torch.load(args.model_path, map_location=device)
     model.load_state_dict(state_dict)
