@@ -9,8 +9,8 @@ def reliability_diagram(probs, labels, output_path, bins=15):
     
     for class_idx in range(num_classes):
         # One-vs-rest labels for the current class
-        labels_bin = (labels == class_idx).astype(int)
-        prob_class = probs[:, class_idx]
+        labels_bin = (labels == class_idx).int().numpy()
+        prob_class = probs[:, class_idx].numpy()
         
         prob_true, prob_pred = calibration_curve(labels_bin, prob_class, n_bins=bins, strategy='uniform')
         
