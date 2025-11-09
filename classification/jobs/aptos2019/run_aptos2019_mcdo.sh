@@ -42,4 +42,4 @@ python -m classification.scripts.evaluate \
     --num_workers 8 \
     --method mcdo \
     --dropout 0.3 \
-    --mc_samples 20 
+    --mc_samples 30 

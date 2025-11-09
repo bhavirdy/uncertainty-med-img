@@ -36,19 +36,19 @@ class ResNet50MCDO(nn.Module):
         # Wrap each ResNet stage with Dropout
         self.model.layer1 = nn.Sequential(
             self.model.layer1,
-            nn.Dropout(p=dropout_p)
+            nn.Dropout2d(p=dropout_p)
         )
         self.model.layer2 = nn.Sequential(
             self.model.layer2,
-            nn.Dropout(p=dropout_p)
+            nn.Dropout2d(p=dropout_p)
         )
         self.model.layer3 = nn.Sequential(
             self.model.layer3,
-            nn.Dropout(p=dropout_p)
+            nn.Dropout2d(p=dropout_p)
         )
         self.model.layer4 = nn.Sequential(
             self.model.layer4,
-            nn.Dropout(p=dropout_p)
+            nn.Dropout2d(p=dropout_p)
         )
 
         # Replace FC with Dropout + Linear
