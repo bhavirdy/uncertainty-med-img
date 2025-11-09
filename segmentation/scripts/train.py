@@ -61,7 +61,7 @@ def train(model, train_loader, val_loader, device, args):
                     lambda_reg=args.lambda_reg
                 )
             else:
-                loss = nn.CrossEntropyLoss()(outputs, labels.long())
+                loss = nn.CrossEntropyLoss(reduction='none')(outputs, labels.long())
 
             loss.backward()
             optimizer.step()
@@ -70,11 +70,11 @@ def train(model, train_loader, val_loader, device, args):
 
             train_dice_metric.update(preds, labels)
             train_iou_metric.update(preds, labels)
-            train_loss += loss.item() * imgs.size(0)
+            train_loss += loss.sum().item()
 
         avg_train_dice = train_dice_metric.compute().item()
         avg_train_iou = train_iou_metric.compute().item()
-        avg_train_loss = train_loss / len(train_loader)
+        avg_train_loss = train_loss / (len(train_loader.dataset) * imgs.size(2) * imgs.size(3))
         
         # --- Validation ---
         model.eval()
@@ -104,11 +104,11 @@ def train(model, train_loader, val_loader, device, args):
 
                 val_dice_metric.update(preds, labels)
                 val_iou_metric.update(preds, labels)
-                val_loss += loss.item() * imgs.size(0)
+                val_loss += loss.sum().item()
 
         avg_val_dice = val_dice_metric.compute().item()
         avg_val_iou = val_iou_metric.compute().item()
-        avg_val_loss = val_loss / len(val_loader)
+        avg_val_loss = val_loss / (len(val_loader.dataset) * imgs.size(2) * imgs.size(3))
 
         scheduler.step(avg_val_dice)
         

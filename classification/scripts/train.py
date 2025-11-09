@@ -79,7 +79,7 @@ def train(model, train_loader, val_loader, device, args):
             train_loss += loss.item() * imgs.size(0)
 
         avg_train_acc = train_acc_metric.compute().item()
-        avg_train_loss = train_loss / len(train_loader)
+        avg_train_loss = train_loss / len(train_loader.dataset)
 
         # --- Validation ---
         model.eval()
@@ -110,7 +110,7 @@ def train(model, train_loader, val_loader, device, args):
                 val_loss += loss.item() * imgs.size(0)
 
         avg_val_acc = val_acc_metric.compute().item()
-        avg_val_loss = val_loss / len(val_loader)
+        avg_val_loss = val_loss / len(val_loader.dataset)
 
         scheduler.step(avg_val_loss)
 
