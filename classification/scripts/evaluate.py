@@ -3,11 +3,11 @@ import json
 import os
 import torch
 from torchmetrics import Accuracy, Precision, Recall, F1Score, AUROC, AveragePrecision, CalibrationError
+from sklearn.metrics import brier_score_loss, log_loss
 
 from classification.models.resnet import ResNet50Deterministic, ResNet50MCDO, ResNet50EDL
 from classification.data_loaders.aptos_data_loader import get_aptos_loaders
 from classification.data_loaders.isic2018_data_loader import get_isic2018_loaders
-from classification.utils.metrics import brier, nll
 from classification.utils.uncertainty import mcdo_predictions, predictive_mean
 from classification.utils.visualisations import reliability_diagram, predictive_entropy_histogram
 
@@ -44,14 +44,17 @@ def evaluate(model, test_loader, device, args):
     preds = torch.argmax(all_probs, dim=1)
 
     # --- Compute metrics ---
-    acc = Accuracy(num_classes=args.num_classes)(preds, all_labels).item()
-    precision = Precision(num_classes=args.num_classes, average='macro')(preds, all_labels).item()
-    recall = Recall(num_classes=args.num_classes, average='macro')(preds, all_labels).item()
-    f1 = F1Score(num_classes=args.num_classes, average='macro')(preds, all_labels).item()
-    auroc = AUROC(num_classes=args.num_classes, average='macro')(all_probs, all_labels).item()
-    aupr = AveragePrecision(num_classes=args.num_classes, average='macro')(all_probs, all_labels).item()
-    ece = CalibrationError(n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs, all_labels).item()
-    mce = CalibrationError(n_bins=15, norm='max', num_classes=args.num_classes)(all_probs, all_labels).item()
+    acc = Accuracy(task='multiclass', num_classes=args.num_classes)(preds, all_labels).item()
+    precision = Precision(task='multiclass', num_classes=args.num_classes, average='macro')(preds, all_labels).item()
+    recall = Recall(task='multiclass', num_classes=args.num_classes, average='macro')(preds, all_labels).item()
+    f1 = F1Score(task='multiclass', num_classes=args.num_classes, average='macro')(preds, all_labels).item()
+    auroc = AUROC(task='multiclass', num_classes=args.num_classes, average='macro')(all_probs, all_labels).item()
+    aupr = AveragePrecision(task='multiclass', num_classes=args.num_classes, average='macro')(all_probs, all_labels).item()
+
+    ece = CalibrationError(task='multiclass', n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs, all_labels).item()
+    mce = CalibrationError(task='multiclass', n_bins=15, norm='max', num_classes=args.num_classes)(all_probs, all_labels).item()
+    brier = brier_score_loss(all_labels.numpy(), all_probs.numpy()) 
+    nll = log_loss(all_labels.numpy(), all_probs.numpy())
 
     # --- Store metrics ---
     metrics = {
@@ -63,8 +66,8 @@ def evaluate(model, test_loader, device, args):
         "aupr": aupr,
         "ece": ece,
         "mce": mce,
-        "brier": brier(all_probs, all_labels),
-        "nll": nll(all_probs, all_labels)
+        "brier": brier,
+        "nll": nll
     }
 
     return metrics, all_probs, all_labels

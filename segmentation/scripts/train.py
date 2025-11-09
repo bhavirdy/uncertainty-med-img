@@ -5,7 +5,7 @@ import torch
 import wandb
 import torch.nn as nn
 import torch.optim as optim
-from torchmetrics.classification import JaccardIndex, F1Score, Accuracy
+from torchmetrics.classification import JaccardIndex, F1Score
 
 from segmentation.models.unet import UNetDeterministic, UNetMCDO, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
@@ -23,12 +23,10 @@ def train(model, train_loader, val_loader, device, args):
     optimizer = optim.Adam(model.parameters(), lr=args.lr)    
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=10)
 
-    train_dice_metric = F1Score(num_classes=args.num_classes, average='macro').to(device)
-    train_iou_metric = JaccardIndex(num_classes=args.num_classes, average='macro').to(device)
-    train_acc_metric = Accuracy(task="multiclass", num_classes=args.num_classes).to(device)
-    val_dice_metric = F1Score(num_classes=args.num_classes, average='macro').to(device)
-    val_iou_metric = JaccardIndex(num_classes=args.num_classes, average='macro').to(device)
-    val_acc_metric = Accuracy(task="multiclass", num_classes=args.num_classes).to(device)
+    train_dice_metric = F1Score(task='multiclass', num_classes=args.num_classes, average='macro').to(device)
+    train_iou_metric = JaccardIndex(task='multiclass', num_classes=args.num_classes, average='macro').to(device)
+    val_dice_metric = F1Score(task='multiclass', num_classes=args.num_classes, average='macro').to(device)
+    val_iou_metric = JaccardIndex(task='multiclass', num_classes=args.num_classes, average='macro').to(device)
     
     best_dice = 0
     early_stop_counter = 0
@@ -37,7 +35,7 @@ def train(model, train_loader, val_loader, device, args):
     log_csv_path = os.path.join(args.output_dir, "train_log.csv")
     with open(log_csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['epoch', 'train_loss', 'train_dice', 'train_iou', 'train_acc', 'val_loss', 'val_dice', 'val_iou', 'val_acc'])
+        writer.writerow(['epoch', 'train_loss', 'train_dice', 'train_iou', 'val_loss', 'val_dice', 'val_iou'])
     
     for epoch in range(args.epochs):
         # --- Training ---
@@ -45,7 +43,6 @@ def train(model, train_loader, val_loader, device, args):
         train_loss = 0.0
         train_dice_metric.reset()
         train_iou_metric.reset()
-        train_acc_metric.reset()
 
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
@@ -73,12 +70,10 @@ def train(model, train_loader, val_loader, device, args):
 
             train_dice_metric.update(preds, labels)
             train_iou_metric.update(preds, labels)
-            train_acc_metric.update(preds, labels)
             train_loss += loss.item() * imgs.size(0)
 
         avg_train_dice = train_dice_metric.compute().item()
         avg_train_iou = train_iou_metric.compute().item()
-        avg_train_acc = train_acc_metric.compute().item()
         avg_train_loss = train_loss / len(train_loader)
         
         # --- Validation ---
@@ -86,7 +81,6 @@ def train(model, train_loader, val_loader, device, args):
         val_loss = 0.0
         val_dice_metric.reset()
         val_iou_metric.reset()
-        val_acc_metric.reset()
 
         with torch.no_grad():
             for imgs, labels in val_loader:
@@ -110,12 +104,10 @@ def train(model, train_loader, val_loader, device, args):
 
                 val_dice_metric.update(preds, labels)
                 val_iou_metric.update(preds, labels)
-                val_acc_metric.update(preds, labels)
                 val_loss += loss.item() * imgs.size(0)
 
         avg_val_dice = val_dice_metric.compute().item()
         avg_val_iou = val_iou_metric.compute().item()
-        avg_val_acc = val_acc_metric.compute().item()
         avg_val_loss = val_loss / len(val_loader)
 
         scheduler.step(avg_val_dice)
@@ -127,7 +119,7 @@ def train(model, train_loader, val_loader, device, args):
         # --- Logging ---
         with open(log_csv_path, 'a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([epoch + 1, avg_train_loss, avg_train_dice, avg_train_iou, avg_train_acc, avg_val_loss, avg_val_dice, avg_val_iou, avg_val_acc])
+            writer.writerow([epoch + 1, avg_train_loss, avg_train_dice, avg_train_iou, avg_val_loss, avg_val_dice, avg_val_iou])
 
         wandb.log({
             'epoch': epoch + 1,

@@ -2,13 +2,13 @@ import argparse
 import json
 import os
 import torch
-from torchmetrics import JaccardIndex, F1Score, Accuracy, AUROC, AveragePrecision, CalibrationError
+from torchmetrics import JaccardIndex, F1Score, CalibrationError
+from sklearn.metrics import brier_score_loss, log_loss
 
 from segmentation.models.unet import UNetDeterministic, UNetMCDO, UNetEDL
 from segmentation.data_loaders.isic2018_segmentation_data_loader import get_isic2018_loaders
-from segmentation.utils.metrics import nll, brier
 from segmentation.utils.uncertainty import mcdo_predictions, predictive_mean
-from segmentation.utils.visualizations import reliability_diagram, predictive_entropy_histogram, uncertainty_heatmap
+from segmentation.utils.visualisations import reliability_diagram, entropy_heatmap
 
 def evaluate(model, test_loader, device, args):
     model = model.to(device)
@@ -48,25 +48,22 @@ def evaluate(model, test_loader, device, args):
     preds_flat = torch.argmax(all_probs_flat, dim=1)
 
     # --- Compute metrics ---
-    dice = F1Score(num_classes=args.num_classes, average='macro')(preds_flat, all_labels_flat).item()
-    iou = JaccardIndex(num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
-    acc = Accuracy(task='multiclass', num_classes=args.num_classes)(preds_flat, all_labels_flat).item()
-    ece = CalibrationError(n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
-    mce = CalibrationError(n_bins=15, norm='max', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
-    auroc = AUROC(num_classes=args.num_classes, average='macro')(all_probs_flat, all_labels_flat).item()
-    aupr = AveragePrecision(num_classes=args.num_classes, average='macro')(all_probs_flat, all_labels_flat).item()
+    dice = F1Score(task='multiclass', num_classes=args.num_classes, average='macro')(preds_flat, all_labels_flat).item()
+    iou = JaccardIndex(task='multiclass', num_classes=args.num_classes, average='macro')(preds_flat, all_labels_flat).item()
+
+    ece = CalibrationError(task='multiclass', n_bins=15, norm='l1', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
+    mce = CalibrationError(task='multiclass', n_bins=15, norm='max', num_classes=args.num_classes)(all_probs_flat, all_labels_flat).item()
+    brier = brier_score_loss(all_labels_flat.numpy(), all_probs_flat.numpy())
+    nll = log_loss(all_labels_flat.numpy(), all_probs_flat.numpy())
 
     # --- Store metrics ---
     metrics = {
         "dice": dice,
         "iou": iou,
-        "pixel_accuracy": acc,
-        "auroc": auroc,
-        "aupr": aupr,
         "ece": ece,
         "mce": mce,
-        "nll": float(nll(all_probs_flat, all_labels_flat)),
-        "brier": float(brier(all_probs_flat, all_labels_flat)),
+        "nll": nll,
+        "brier": brier
     }
 
     return metrics, all_probs, all_labels
@@ -81,8 +78,7 @@ def save_metrics(metrics, output_dir, method):
 def generate_plots(all_probs, all_labels, output_dir, method):
     os.makedirs(output_dir, exist_ok=True)
     reliability_diagram(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_reliability_diagram.png"))
-    predictive_entropy_histogram(all_probs, output_path=os.path.join(output_dir, f"{method}_entropy_histogram.png"))
-    uncertainty_heatmap(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_uncertainty_heatmap.png"), method='entropy')    
+    entropy_heatmap(all_probs, all_labels, output_path=os.path.join(output_dir, f"{method}_entropy_heatmap.png"))    
 
 def main():
     parser = argparse.ArgumentParser()
