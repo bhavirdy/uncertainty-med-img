@@ -40,4 +40,4 @@ python -m segmentation.scripts.evaluate \
     --num_workers 8 \
     --method mcdo \
     --dropout 0.3 \
-    --mc_samples 30
+    --mc_samples 50
