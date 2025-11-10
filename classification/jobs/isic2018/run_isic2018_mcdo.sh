@@ -7,6 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
+#SBATCH --exclude=mscluster42,mscluster44
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
