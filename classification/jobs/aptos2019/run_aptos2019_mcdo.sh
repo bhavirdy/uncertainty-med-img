@@ -29,7 +29,7 @@ python -m classification.scripts.train \
     --warmup_epochs 5 \
     --early_stop_patience 10 \
     --method mcdo \
-    --dropout 0.5
+    --dropout 0.3
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
@@ -41,5 +41,5 @@ python -m classification.scripts.evaluate \
     --batch_size 32 \
     --num_workers 8 \
     --method mcdo \
-    --dropout 0.5 \
+    --dropout 0.3 \
     --mc_samples 50 
