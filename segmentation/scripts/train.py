@@ -60,6 +60,15 @@ def train(model, train_loader, val_loader, device, args):
                     annealing_epochs=args.annealing_epochs,
                     lambda_reg=args.lambda_reg
                 )
+                if epoch % 5 == 0:
+                    evidence = outputs - 1
+                    S = outputs.sum(dim=1)
+                    
+                    wandb.log({
+                        'mean_evidence': evidence.mean().item(),
+                        'max_evidence': evidence.max().item(),
+                        'mean_S': S.mean().item()
+                    })
             else:
                 loss = nn.CrossEntropyLoss()(outputs, labels.long())
 
