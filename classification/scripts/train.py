@@ -25,7 +25,8 @@ def train(model, train_loader, val_loader, device, args):
     warmup_lr = args.warmup_lr
 
     optimizer = optim.AdamW(model.model.fc.parameters(), lr=warmup_lr, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
     train_acc_metric = Accuracy(task="multiclass", num_classes=args.num_classes).to(device)
     val_acc_metric = Accuracy(task="multiclass", num_classes=args.num_classes).to(device)
@@ -45,7 +46,8 @@ def train(model, train_loader, val_loader, device, args):
             for param in model.parameters():
                 param.requires_grad = True
             optimizer = optim.AdamW(model.parameters(), lr=base_lr, weight_decay=1e-4)
-            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
+            # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs - args.warmup_epochs)
 
         # --- Training ---
         model.train()
@@ -121,7 +123,8 @@ def train(model, train_loader, val_loader, device, args):
         avg_val_acc = val_acc_metric.compute().item()
         avg_val_loss = val_loss / len(val_loader.dataset)
 
-        scheduler.step(avg_val_loss)
+        # scheduler.step(avg_val_loss)
+        scheduler.step()
 
         print(f"Epoch: {epoch+1}/{args.epochs}, "
               f"Train Loss: {avg_train_loss:.4f}, Train Acc: {avg_train_acc:.4f}, "
