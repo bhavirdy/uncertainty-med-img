@@ -22,7 +22,7 @@ python -m segmentation.scripts.train \
     --dataset isic2018 \
     --num_classes 2 \
     --output_dir "$TRAIN_DIR" \
-    --epochs 50 \
+    --epochs 10 \
     --batch_size 32 \
     --num_workers 8 \
     --lr 1e-4 \
