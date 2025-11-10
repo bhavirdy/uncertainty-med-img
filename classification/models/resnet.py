@@ -34,28 +34,13 @@ class ResNet50MCDO(nn.Module):
             param.requires_grad = False
 
         # Wrap each ResNet stage with Dropout
-        self.model.layer1 = nn.Sequential(
-            self.model.layer1,
-            nn.Dropout2d(p=dropout_p)
-        )
-        self.model.layer2 = nn.Sequential(
-            self.model.layer2,
-            nn.Dropout2d(p=dropout_p)
-        )
-        self.model.layer3 = nn.Sequential(
-            self.model.layer3,
-            nn.Dropout2d(p=dropout_p)
-        )
-        self.model.layer4 = nn.Sequential(
-            self.model.layer4,
-            nn.Dropout2d(p=dropout_p)
-        )
+        self.model.layer1 = nn.Sequential(self.model.layer1, nn.Dropout2d(p=dropout_p))
+        self.model.layer2 = nn.Sequential(self.model.layer2, nn.Dropout2d(p=dropout_p))
+        self.model.layer3 = nn.Sequential(self.model.layer3, nn.Dropout2d(p=dropout_p))
+        self.model.layer4 = nn.Sequential(self.model.layer4, nn.Dropout2d(p=dropout_p))
 
         # Replace FC with Dropout + Linear
-        self.model.fc = nn.Sequential(
-            nn.Dropout(p=dropout_p),
-            nn.Linear(self.model.fc.in_features, num_classes)
-        )
+        self.model.fc = nn.Sequential(nn.Dropout(p=dropout_p), nn.Linear(self.model.fc.in_features, num_classes))
 
         # Make FC trainable
         for param in self.model.fc.parameters():
