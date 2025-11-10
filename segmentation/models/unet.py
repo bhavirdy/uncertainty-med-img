@@ -15,7 +15,6 @@ class UNetDeterministic(nn.Module):
         return self.model(x)
 
 class DecoderBlockWithDropout(nn.Module):
-    """Wrapper that adds dropout after a decoder block."""
     def __init__(self, decoder_block, dropout_p=0.3):
         super().__init__()
         self.decoder_block = decoder_block
@@ -43,7 +42,6 @@ class UNetMCDO(nn.Module):
         self.final_dropout = nn.Dropout2d(p=dropout_p)
     
     def _add_dropout_to_decoder(self, dropout_p):
-        """Wrap each decoder block to add dropout after it."""
         decoder = self.unet.decoder
         
         # Wrap each decoder block with dropout

@@ -1,6 +1,5 @@
 import torch.nn as nn
 from torchvision.models import resnet50, ResNet50_Weights
-from torchvision.models.resnet import Bottleneck
 
 class ResNet50Deterministic(nn.Module):
     def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT):
@@ -24,7 +23,7 @@ class ResNet50Deterministic(nn.Module):
         return self.model(x)
 
 class ResNet50MCDO(nn.Module):
-    def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=0.5):
+    def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=0.3):
         super().__init__()
 
         # Load pretrained ResNet50

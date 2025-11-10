@@ -6,8 +6,6 @@ def mcdo_predictions(model, inputs, n_samples=50):
     for m in model.modules():
             if isinstance(m, nn.Dropout) or isinstance(m, nn.Dropout2d):
                 m.train()
-            else:
-                m.eval()
     preds = []
     with torch.no_grad():
         for _ in range(n_samples):
