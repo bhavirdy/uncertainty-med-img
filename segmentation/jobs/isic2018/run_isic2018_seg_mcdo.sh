@@ -27,7 +27,7 @@ python -m segmentation.scripts.train \
     --lr 1e-4 \
     --early_stop_patience 20 \
     --method mcdo \
-    --dropout 0.5
+    --dropout 0.3
 
 MODEL_PATH="$TRAIN_DIR/best_model.pth"
 
@@ -39,5 +39,5 @@ python -m segmentation.scripts.evaluate \
     --batch_size 32 \
     --num_workers 8 \
     --method mcdo \
-    --dropout 0.5 \
+    --dropout 0.3 \
     --mc_samples 50

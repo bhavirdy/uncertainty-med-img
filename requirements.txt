@@ -1,7 +1,12 @@
 torch
 torchvision
+pandas
+Pillow
+opencv-python
 numpy
-pillow
-matplotlib
+torchmetrics
+scikit-learn
 wandb
+matplotlib
+albumentations
 segmentation-models-pytorch

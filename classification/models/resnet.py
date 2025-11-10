@@ -33,8 +33,7 @@ class ResNet50MCDO(nn.Module):
         for param in self.model.parameters():
             param.requires_grad = False
 
-        # Wrap each ResNet stage with Dropout
-        # self.model.layer1 = nn.Sequential(self.model.layer1, nn.Dropout2d(p=dropout_p))
+        # Wrap each ResNet stage with Dropout2d (except the first)
         self.model.layer2 = nn.Sequential(self.model.layer2, nn.Dropout2d(p=dropout_p))
         self.model.layer3 = nn.Sequential(self.model.layer3, nn.Dropout2d(p=dropout_p))
         self.model.layer4 = nn.Sequential(self.model.layer4, nn.Dropout2d(p=dropout_p))
