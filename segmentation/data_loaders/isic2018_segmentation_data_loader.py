@@ -83,20 +83,3 @@ def get_isic2018_loaders(
     test_loader = DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return train_loader, val_loader, test_loader
-
-def get_isic2018_loaders_test(
-        root="./segmentation/datasets/isic2018seg",
-        batch_size=8,
-        input_size=224,
-        num_workers=4
-    ):
-    train_img_dir = os.path.join(root, "validation_input")
-    train_mask_dir = os.path.join(root, "validation_gt")
-
-    train_tf, _ = get_transforms(input_size)
-
-    train_set = ISIC2018SegmentationDataset(train_img_dir, train_mask_dir, transform=train_tf)
-
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-
-    return train_loader
