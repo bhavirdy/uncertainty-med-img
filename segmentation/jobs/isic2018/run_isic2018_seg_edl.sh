@@ -28,7 +28,7 @@ python -m segmentation.scripts.train \
     --early_stop_patience 20 \
     --method edl \
     --annealing_epochs 10 \
-    --lambda_reg 0.001
+    --lambda_reg 0.01
 
 MODEL_PATH="$TRAIN_DIR/best_model.pth"
 
