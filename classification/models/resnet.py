@@ -45,9 +45,9 @@ class ResNet50MCDO(nn.Module):
                     return dropout(out)
                 block.forward = new_forward
 
-        # Replace final fully connected layer with dropout + linear, use a higher dropout prob
+        # Replace final fully connected layer with dropout + linear
         self.model.fc = nn.Sequential(
-            nn.Dropout(p=0.5),
+            nn.Dropout(p=dropout_p),
             nn.Linear(self.model.fc.in_features, num_classes)
         )
 
