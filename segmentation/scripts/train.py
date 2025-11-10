@@ -66,7 +66,11 @@ def train(model, train_loader, val_loader, device, args):
             loss.backward()
             optimizer.step()
 
-            preds = torch.argmax(outputs, dim=1)
+            if args.method == 'edl':
+                probs = outputs / outputs.sum(dim=1, keepdim=True)
+                preds = torch.argmax(probs, dim=1)
+            else:
+                preds = torch.argmax(outputs, dim=1)
 
             train_dice_metric.update(preds, labels)
             train_iou_metric.update(preds, labels)
@@ -100,7 +104,11 @@ def train(model, train_loader, val_loader, device, args):
                 else:
                     loss = nn.CrossEntropyLoss()(outputs, labels.long())
 
-                preds = torch.argmax(outputs, dim=1)
+                if args.method == 'edl':
+                    probs = outputs / outputs.sum(dim=1, keepdim=True)
+                    preds = torch.argmax(probs, dim=1)
+                else:
+                    preds = torch.argmax(outputs, dim=1)
 
                 val_dice_metric.update(preds, labels)
                 val_iou_metric.update(preds, labels)
