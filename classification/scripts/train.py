@@ -45,6 +45,7 @@ def train(model, train_loader, val_loader, device, args):
             for param in model.parameters():
                 param.requires_grad = True
             optimizer = optim.AdamW(model.parameters(), lr=base_lr, weight_decay=1e-4)
+            scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
 
         # --- Training ---
         model.train()
