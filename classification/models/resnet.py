@@ -23,7 +23,7 @@ class ResNet50Deterministic(nn.Module):
         return self.model(x)
 
 class ResNet50MCDO(nn.Module):
-    def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=0.3):
+    def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=0.5):
         super().__init__()
 
         # Load pretrained ResNet50

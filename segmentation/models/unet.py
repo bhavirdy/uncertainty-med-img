@@ -27,8 +27,7 @@ class DecoderBlockWithDropout(nn.Module):
         return x
 
 class UNetMCDO(nn.Module):
-    def __init__(self, n_channels=3, n_classes=2, encoder_name='resnet34', 
-                 encoder_weights='imagenet', dropout_p=0.3):
+    def __init__(self, n_channels=3, n_classes=2, encoder_name='resnet34', encoder_weights='imagenet', dropout_p=0.5):
         super().__init__()
         self.unet = smp.Unet(
             encoder_name=encoder_name,
