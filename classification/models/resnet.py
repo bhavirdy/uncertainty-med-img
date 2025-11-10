@@ -23,6 +23,17 @@ class ResNet50Deterministic(nn.Module):
     def forward(self, x):
         return self.model(x)
 
+class BottleneckWithMC(nn.Module):
+    def __init__(self, block, dropout_p=0.3):
+        super().__init__()
+        self.block = block
+        self.dropout = nn.Dropout2d(p=dropout_p)
+    
+    def forward(self, x):
+        out = self.block(x)
+        out = self.dropout(out)
+        return out
+
 class ResNet50MCDO(nn.Module):
     def __init__(self, num_classes, weights=ResNet50_Weights.DEFAULT, dropout_p=0.3):
         super().__init__()
@@ -32,18 +43,19 @@ class ResNet50MCDO(nn.Module):
         for p in self.model.parameters():
             p.requires_grad = False
 
-        # Inject Dropout2d into Bottleneck blocks
-        for layer in [self.model.layer2, self.model.layer3, self.model.layer4]:
-            for block in layer:
-                # Add dropout after each residual block's ReLU
-                block.dropout = nn.Dropout(p=dropout_p)
-                
-                # Modify forward pass of the block to include dropout
-                orig_forward = block.forward
-                def new_forward(x, orig_forward=orig_forward, dropout=block.dropout):
-                    out = orig_forward(x)
-                    return dropout(out)
-                block.forward = new_forward
+        # Inject Dropout into Bottleneck blocks
+        self.model.layer2 = nn.Sequential(*[
+            BottleneckWithMC(block, dropout_p=dropout_p)
+            for block in self.model.layer2
+        ])
+        self.model.layer3 = nn.Sequential(*[
+            BottleneckWithMC(block, dropout_p=dropout_p)
+            for block in self.model.layer3
+        ])
+        self.model.layer4 = nn.Sequential(*[
+            BottleneckWithMC(block, dropout_p=dropout_p)
+            for block in self.model.layer4
+        ])
 
         # Replace final fully connected layer with dropout + linear
         self.model.fc = nn.Sequential(
