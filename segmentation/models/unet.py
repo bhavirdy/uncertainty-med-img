@@ -69,7 +69,7 @@ class UNetEDL(nn.Module):
             classes=n_classes
         )
         # Evidence transformation: ensures non-negative evidence
-        self.evidence_head = nn.Softplus()
+        self.evidence_head = nn.ReLU()
 
     def forward(self, x):
         outputs = self.backbone(x)

@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Dirichlet, kl_divergence
 
-def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
+def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=20, lambda_reg=0.01):
     # (B, C, H, W)
     S = alpha.sum(dim=1, keepdim=True)
     probs = alpha / S
@@ -17,7 +17,7 @@ def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lamb
     var = (probs * (1 - probs) / (S + 1)).sum(dim=1)
 
     # 3. KL divergence term
-    alpha_tilde = target_onehot + (1 - target_onehot) * alpha  # (B, C, H, W)
+    alpha_tilde = alpha * target_onehot + (1 - target_onehot)  # (B, C, H, W)
     beta = torch.ones((1, num_classes, 1, 1), device=alpha.device)
 
     # Flatten spatial dims for batched Dirichlet ops
