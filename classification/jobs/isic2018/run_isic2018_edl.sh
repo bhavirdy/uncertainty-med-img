@@ -31,7 +31,7 @@ python -m classification.scripts.train \
     --early_stop_patience 10 \
     --method edl \
     --annealing_epochs 10 \
-    --lambda_reg 0.01
+    --lambda_reg 1.0
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
