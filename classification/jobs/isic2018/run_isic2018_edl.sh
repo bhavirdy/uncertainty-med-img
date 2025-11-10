@@ -28,9 +28,9 @@ python -m classification.scripts.train \
     --lr 1e-4 \
     --warmup_lr 1e-3 \
     --warmup_epochs 5 \
-    --early_stop_patience 10 \
+    --early_stop_patience 15 \
     --method edl \
-    --annealing_epochs 10 \
+    --annealing_epochs 50 \
     --lambda_reg 1.0
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
