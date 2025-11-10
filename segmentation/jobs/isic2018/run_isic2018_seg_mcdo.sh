@@ -7,6 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
+#SBATCH --exclude=mscluster42,mscluster44,mscluster48
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
@@ -21,7 +22,7 @@ python -m segmentation.scripts.train \
     --dataset isic2018 \
     --num_classes 2 \
     --output_dir "$TRAIN_DIR" \
-    --epochs 10 \
+    --epochs 100 \
     --batch_size 32 \
     --num_workers 8 \
     --lr 1e-4 \
