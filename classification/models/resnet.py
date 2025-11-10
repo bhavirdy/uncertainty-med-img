@@ -27,7 +27,7 @@ class BottleneckWithMC(nn.Module):
     def __init__(self, block, dropout_p=0.3):
         super().__init__()
         self.block = block
-        self.dropout = nn.Dropout2d(p=dropout_p)
+        self.dropout = nn.Dropout(p=dropout_p)
     
     def forward(self, x):
         out = self.block(x)
