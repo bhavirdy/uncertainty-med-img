@@ -33,7 +33,7 @@ class ResNet50MCDO(nn.Module):
             p.requires_grad = False
 
         # Inject Dropout2d into Bottleneck blocks
-        for layer in [self.model.layer1, self.model.layer2, self.model.layer3, self.model.layer4]:
+        for layer in [self.model.layer2, self.model.layer3, self.model.layer4]:
             for block in layer:
                 # Add dropout after each residual block's ReLU
                 block.dropout = nn.Dropout2d(p=dropout_p)
