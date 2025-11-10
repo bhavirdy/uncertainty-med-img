@@ -1,7 +1,13 @@
 import torch
+import torch.nn as nn
 
 def mcdo_predictions(model, inputs, n_samples=50):
-    model.train()  # enable dropout
+    # Enable dropout
+    for m in model.modules():
+        if isinstance(m, (nn.Dropout, nn.Dropout2d)):
+            m.train()
+        else:
+            m.eval()
     preds = []
     with torch.no_grad():
         for _ in range(n_samples):
