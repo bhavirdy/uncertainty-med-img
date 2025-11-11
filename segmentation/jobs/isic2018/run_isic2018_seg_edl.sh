@@ -26,7 +26,7 @@ python -m segmentation.scripts.train \
     --batch_size 32 \
     --num_workers 8 \
     --lr 1e-4 \
-    --early_stop_patience 20 \
+    --early_stop_patience 10 \
     --method edl \
     --zeta 1.0 \
 
