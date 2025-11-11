@@ -27,14 +27,6 @@ def evidential_loss(alpha, target, num_classes, epoch, zeta):
     # 4. Annealing coefficient
     annealing_coef = min(1.0, epoch / 10)
 
-    # Log individual magnitudes
-    mse_mag = mse.mean().item()
-    var_mag = var.mean().item()
-    kl_mag = kl_div.mean().item()
-    
-    print(f"Epoch {epoch}: MSE={mse_mag:.6f}, VAR={var_mag:.6f}, "
-          f"KL={kl_mag:.6f}, KL*coef={kl_mag*annealing_coef:.6f}")
-
     # 5. Total loss
     loss = mse + var + zeta * annealing_coef * kl_div
     return loss.mean()
