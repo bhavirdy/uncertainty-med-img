@@ -170,7 +170,7 @@ def main():
     
     parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
     parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--zeta', type=int, default=0.1)
+    parser.add_argument('--zeta', type=float, default=0.1)
 
     args = parser.parse_args()
 
