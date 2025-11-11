@@ -13,7 +13,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./classification/results/isic2018/edl/run_${TIMESTAMP}"
+RUN_DIR="./classification/results/isic2018/edl_05/run_${TIMESTAMP}"
 TRAIN_DIR="$RUN_DIR/train"
 EVAL_DIR="$RUN_DIR/eval"
 mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
@@ -30,7 +30,7 @@ python -m classification.scripts.train \
     --warmup_epochs 5 \
     --early_stop_patience 10 \
     --method edl \
-    --zeta 0.01
+    --zeta 0.05
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
