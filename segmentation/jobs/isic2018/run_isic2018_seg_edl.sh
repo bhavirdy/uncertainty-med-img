@@ -13,7 +13,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate opencv_env
 
 TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
-RUN_DIR="./segmentation/results/isic2018/edl/run_${TIMESTAMP}"
+RUN_DIR="./segmentation/results/isic2018/edl_08/run_${TIMESTAMP}"
 TRAIN_DIR="$RUN_DIR/train"
 EVAL_DIR="$RUN_DIR/eval"
 mkdir -p "$TRAIN_DIR" "$EVAL_DIR" logs
@@ -28,7 +28,7 @@ python -m segmentation.scripts.train \
     --lr 1e-4 \
     --early_stop_patience 20 \
     --method edl \
-    --zeta 0.5 \
+    --zeta 0.8 \
 
 MODEL_PATH="$TRAIN_DIR/best_model.pth"
 
