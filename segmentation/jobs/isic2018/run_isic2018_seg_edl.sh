@@ -28,7 +28,7 @@ python -m segmentation.scripts.train \
     --lr 1e-4 \
     --early_stop_patience 20 \
     --method edl \
-    --zeta 0.8 \
+    --zeta 0.5 \
 
 MODEL_PATH="$TRAIN_DIR/best_model.pth"
 
