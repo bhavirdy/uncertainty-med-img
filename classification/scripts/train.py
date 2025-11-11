@@ -67,8 +67,7 @@ def train(model, train_loader, val_loader, device, args):
                     target=labels,
                     num_classes=args.num_classes,
                     epoch=epoch,
-                    annealing_epochs=args.annealing_epochs,
-                    lambda_reg=args.lambda_reg
+                    zeta=args.zeta
                 )
             else:
                 loss = nn.CrossEntropyLoss()(outputs, labels)
@@ -105,8 +104,7 @@ def train(model, train_loader, val_loader, device, args):
                         target=labels,
                         num_classes=args.num_classes,
                         epoch=epoch,
-                        annealing_epochs=args.annealing_epochs,
-                        lambda_reg=args.lambda_reg
+                        zeta=args.zeta
                     )
                 else:
                     loss = nn.CrossEntropyLoss()(outputs, labels)
@@ -180,8 +178,7 @@ def main():
     
     parser.add_argument("--method", type=str, required=True, choices=["deterministic", "mcdo", "edl"])
     parser.add_argument('--dropout', type=float, default=0.3)
-    parser.add_argument('--annealing_epochs', type=int, default=10)
-    parser.add_argument('--lambda_reg', type=float, default=0.001)
+    parser.add_argument('--zeta', type=int, default=0.1)
     
     args = parser.parse_args()
 

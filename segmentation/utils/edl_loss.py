@@ -3,7 +3,7 @@ import wandb
 import torch.nn.functional as F
 from torch.distributions import Dirichlet, kl_divergence
 
-def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10):
+def evidential_loss(alpha, target, num_classes, epoch, zeta):
     # (B, C, H, W)
     S = alpha.sum(dim=1, keepdim=True)
     probs = alpha / S
@@ -33,9 +33,9 @@ def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10):
     kl_div = kl_div_flat.view(B, H, W)
 
     # 4. Annealing coefficient
-    annealing_coef = min(1.0, epoch / annealing_epochs)
+    annealing_coef = min(1.0, epoch / 10)
 
     # 5. Total loss (mean over all pixels)
-    loss = mse + var + annealing_coef * kl_div
+    loss = mse + var + zeta * annealing_coef * kl_div
 
     return loss.mean()

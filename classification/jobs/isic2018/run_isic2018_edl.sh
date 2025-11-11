@@ -30,8 +30,7 @@ python -m classification.scripts.train \
     --warmup_epochs 5 \
     --early_stop_patience 15 \
     --method edl \
-    --annealing_epochs 100 \
-    --lambda_reg 1.0
+    --zeta 0.01
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 

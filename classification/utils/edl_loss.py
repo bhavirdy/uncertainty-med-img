@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch.distributions import Dirichlet, kl_divergence
 
-def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lambda_reg=0.01):
+def evidential_loss(alpha, target, num_classes, epoch, zeta):
     S = alpha.sum(dim=1, keepdim=True)
     probs = alpha / S
 
@@ -25,8 +25,8 @@ def evidential_loss(alpha, target, num_classes, epoch, annealing_epochs=10, lamb
     kl_div = kl_divergence(dirichlet_p, dirichlet_q)
 
     # 4. Annealing coefficient
-    annealing_coef = min(1.0, epoch / annealing_epochs)
+    annealing_coef = min(1.0, epoch / 10)
 
     # 5. Total loss
-    loss = mse + var + lambda_reg * annealing_coef * kl_div
+    loss = mse + var + zeta * annealing_coef * kl_div
     return loss.mean()
