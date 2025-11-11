@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import segmentation_models_pytorch as smp
 
@@ -18,7 +19,7 @@ class DecoderBlockWithDropout(nn.Module):
     def __init__(self, decoder_block, dropout_p=0.3):
         super().__init__()
         self.decoder_block = decoder_block
-        self.dropout = nn.Dropout2d(p=dropout_p)
+        self.dropout = nn.Dropout(p=dropout_p)
     
     def forward(self, feature_map, target_height, target_width, skip_connection=None):
         x = self.decoder_block(feature_map, target_height, target_width, skip_connection)
@@ -26,7 +27,7 @@ class DecoderBlockWithDropout(nn.Module):
         return x
 
 class UNetMCDO(nn.Module):
-    def __init__(self, n_channels=3, n_classes=2, encoder_name='resnet34', encoder_weights='imagenet', dropout_p=0.5):
+    def __init__(self, n_channels=3, n_classes=2, encoder_name='resnet34', encoder_weights='imagenet', dropout_p=0.3):
         super().__init__()
         self.unet = smp.Unet(
             encoder_name=encoder_name,
@@ -39,7 +40,7 @@ class UNetMCDO(nn.Module):
         self._add_dropout_to_decoder(dropout_p)
         
         # Add dropout before final segmentation head
-        self.final_dropout = nn.Dropout2d(p=dropout_p)
+        self.final_dropout = nn.Dropout(p=dropout_p)
     
     def _add_dropout_to_decoder(self, dropout_p):
         decoder = self.unet.decoder
