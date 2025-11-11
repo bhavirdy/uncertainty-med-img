@@ -30,7 +30,7 @@ python -m classification.scripts.train \
     --warmup_epochs 5 \
     --early_stop_patience 15 \
     --method edl \
-    --zeta 0.01
+    --zeta 0.1
 
 MODEL_PATH="$TRAIN_DIR/model.pth"
 
